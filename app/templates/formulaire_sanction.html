@@ -1,0 +1,79 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Nouvelle sanction{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Enregistrer une sanction</div>
+    <div class="page-subtitle">{{ employe.nom }} {{ employe.prenom }} — Matricule {{ employe.matricule or "—" }}</div>
+  </div>
+  <a href="/employes/{{ employe.id }}?onglet=disciplinaire" class="btn btn-outline">
+    <i class="fas fa-arrow-left"></i> Retour à la fiche
+  </a>
+</div>
+
+{% if erreur %}
+<div class="alert alert-danger">
+  <span><i class="fas fa-circle-exclamation" style="margin-right:6px;"></i>{{ erreur }}</span>
+</div>
+{% endif %}
+
+<div class="card" style="padding:24px;max-width:800px;">
+  <form method="post" action="/employes/{{ employe.id }}/sanctions/nouvelle">
+    {{ csrf_input(request) }}
+    <div class="form-grid">
+      <div>
+        <label class="form-label">Date de la sanction *</label>
+        <input type="date" name="date_sanction" class="form-control" required
+               value="{{ valeurs.date_sanction or '' }}">
+      </div>
+      <div>
+        <label class="form-label">Type de sanction *</label>
+        <select name="type_sanction" class="form-control" required id="type-sanction" onchange="toggleDuree()">
+          <option value="">— Choisir —</option>
+          {% for opt in ["Avertissement", "Blâme", "Mise à pied"] %}
+          <option value="{{ opt }}" {% if valeurs.type_sanction == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Motif *</label>
+        <textarea name="motif" class="form-control" rows="3" required
+                  placeholder="Description des faits reprochés...">{{ valeurs.motif or '' }}</textarea>
+      </div>
+      <div id="bloc-duree" style="display:none;">
+        <label class="form-label">Durée (pour une mise à pied)</label>
+        <input type="text" name="duree" class="form-control"
+               placeholder="ex: 3 jours, 1 semaine..." value="{{ valeurs.duree or '' }}">
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Commentaire additionnel (optionnel)</label>
+        <textarea name="commentaire" class="form-control" rows="2"
+                  placeholder="Notes complémentaires...">{{ valeurs.commentaire or '' }}</textarea>
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Enregistré par</label>
+        <input type="text" name="enregistre_par" class="form-control"
+               placeholder="Nom du responsable RH" value="{{ valeurs.enregistre_par or '' }}">
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px;">
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-save"></i> Enregistrer la sanction
+      </button>
+      <a href="/employes/{{ employe.id }}?onglet=disciplinaire" class="btn btn-outline">Annuler</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  function toggleDuree() {
+    var type = document.getElementById('type-sanction').value;
+    var bloc = document.getElementById('bloc-duree');
+    bloc.style.display = (type === 'Mise à pied') ? 'block' : 'none';
+  }
+  document.addEventListener('DOMContentLoaded', toggleDuree);
+</script>
+
+{% endblock %}

@@ -1,0 +1,227 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Absences{% endblock %}
+{% block content %}
+<div class="flex flex-col gap-4">
+
+   <!-- Filtres (masquables) + Bouton nouvelle absence -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5 zone-filtres" id="zone-filtres-absences">
+    <div class="flex items-center justify-between">
+      <button type="button" onclick="toggleFiltres('zone-filtres-absences')" class="btn-toggle-filtres inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold hover:bg-surface-container-highest transition-all">
+        <span class="material-symbols-outlined text-[18px]">filter_list</span>
+        <span>Filtres</span>
+        <span class="badge-filtres-actifs inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-primary-container text-white text-[11px] font-bold" style="display:none;"></span>
+      </button>
+      <a href="/absences/nouvelle" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-primary-container text-white shadow-sm hover:opacity-95 transition-all text-[13px] font-semibold">
+        <span class="material-symbols-outlined text-[18px]">add</span>
+        <span>Nouvelle absence</span>
+      </a>
+    </div>
+
+    <div class="filtres-contenu" style="display:none;margin-top:16px;">
+      <form method="get" action="/absences">
+        <!-- Ligne 1 : Recherche + Type + Agence -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 mb-3">
+          <div class="lg:col-span-4">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Recherche employé</label>
+            <div class="relative">
+              <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">search</span>
+              <input type="text" name="q" value="{{ q or '' }}"
+                     class="w-full h-[38px] pl-9 pr-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                     placeholder="Nom, prénom ou matricule...">
+            </div>
+          </div>
+
+          <div class="lg:col-span-4">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Type d'absence</label>
+            <select name="type_absence_id" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="">Tous les types</option>
+              {% for t in types_absence %}
+              <option value="{{ t.id }}" {% if type_absence_id == t.id|string %}selected{% endif %}>{{ t.libelle }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="lg:col-span-4">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Agence</label>
+            <select name="agence_id" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="">Toutes les agences</option>
+              {% for a in agences %}
+              <option value="{{ a.id }}" {% if agence_id == a.id|string %}selected{% endif %}>{{ a.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Ligne 2 : Département + Sexe + Tranche d'âge + Période -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 mb-3">
+          <div class="lg:col-span-3">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Département</label>
+            <select name="departement_id" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="">Tous les départements</option>
+              {% for d in departements %}
+              <option value="{{ d.id }}" {% if departement_id == d.id|string %}selected{% endif %}>{{ d.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="lg:col-span-2">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Sexe</label>
+            <select name="sexe" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="">Tous</option>
+              <option value="H" {% if sexe == "H" %}selected{% endif %}>Homme</option>
+              <option value="F" {% if sexe == "F" %}selected{% endif %}>Femme</option>
+            </select>
+          </div>
+
+          <div class="lg:col-span-3">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Tranche d'âge</label>
+            <select name="tranche_age" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="">Toutes</option>
+              {% for t in ["≤25", "26-35", "36-45", "46-55", "56+"] %}
+              <option value="{{ t }}" {% if tranche_age == t %}selected{% endif %}>{{ t }} ans</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="lg:col-span-4">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Statut de l'absence</label>
+            <select name="periode" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="en_cours" {% if periode == "en_cours" or not periode %}selected{% endif %}>Absences en cours</option>
+              <option value="passees" {% if periode == "passees" %}selected{% endif %}>Absences passées</option>
+              <option value="toutes" {% if periode == "toutes" %}selected{% endif %}>Toutes les absences</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Ligne 3 : Embauché entre + Période d'absence -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+          <div class="lg:col-span-2">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Embauché après</label>
+            <input type="date" name="embauche_debut" value="{{ embauche_debut or '' }}"
+                   class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+          </div>
+          <div class="lg:col-span-2">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Embauché avant</label>
+            <input type="date" name="embauche_fin" value="{{ embauche_fin or '' }}"
+                   class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+          </div>
+          <div class="lg:col-span-2">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Absence du</label>
+            <input type="date" name="date_debut" value="{{ date_debut or '' }}"
+                   class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+          </div>
+          <div class="lg:col-span-2">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Absence au</label>
+            <input type="date" name="date_fin" value="{{ date_fin or '' }}"
+                   class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+          </div>
+
+          <div class="lg:col-span-4 flex flex-col gap-1.5 pb-1">
+            <label class="inline-flex items-center gap-2 text-[13px] text-on-surface-variant cursor-pointer">
+              <input type="checkbox" name="non_justifiees" value="1" {% if non_justifiees %}checked{% endif %} class="accent-[#06547a]">
+              Non justifiées uniquement
+            </label>
+            <label class="inline-flex items-center gap-2 text-[13px] text-on-surface-variant cursor-pointer">
+              <input type="checkbox" name="masquer_archivees" value="1" {% if masquer_archivees %}checked{% endif %} class="accent-[#06547a]">
+              Masquer les archivées
+            </label>
+          </div>
+        </div>
+
+        <!-- Boutons -->
+        <div class="flex items-center justify-end gap-3 mt-4 pt-3 border-t border-surface-container-high">
+          <a href="/absences" class="text-[13px] text-on-surface-variant hover:text-primary underline underline-offset-4">
+            Réinitialiser les filtres
+          </a>
+          <button type="submit" class="inline-flex items-center justify-center gap-2 h-[38px] px-5 rounded-lg bg-primary-container text-white text-[13px] font-semibold shadow-sm hover:opacity-95 transition-all">
+            <span class="material-symbols-outlined text-[18px]">search</span>
+            <span>Filtrer</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if request.query_params.get('ok') %}
+  <div class="px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px] flex items-center justify-between">
+    <span>{{ request.query_params.get('ok') }}</span>
+  </div>
+  {% endif %}
+
+  <p class="text-[12.5px] text-on-surface-variant">{{ total_absences }} absence(s) — regroupées par agence</p>
+
+  {% for nom_agence, liste in groupes %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+          <span class="material-symbols-outlined text-[20px]">{{ "corporate_fare" if nom_agence == "Direction Générale" else "storefront" }}</span>
+        </div>
+        <span class="text-[15px] font-semibold text-on-surface">{{ nom_agence }}</span>
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] bg-secondary-fixed text-on-secondary-fixed font-medium">{{ liste|length }}</span>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Employé</th>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Du</th>
+            <th class="py-3 px-4">Au</th>
+            <th class="py-3 px-4">Justificatif</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for a in liste %}
+          <tr class="border-t border-surface-container-high hover:bg-surface-container-low/40 cursor-pointer {% if a.archivee %}opacity-50 bg-surface-container-low{% endif %}"
+              onclick="if (!event.target.closest('form') && !event.target.closest('button') && !event.target.closest('a')) window.location='/absences/{{ a.id }}';">
+            <td class="py-3 px-4 font-medium">{{ a.employe.nom }} {{ a.employe.prenom }}</td>
+            <td class="py-3 px-4">{{ a.type_absence.libelle if a.type_absence else "—" }}</td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ a.date_debut.strftime("%d/%m/%Y") if a.date_debut else "—" }}</td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ a.date_fin.strftime("%d/%m/%Y") if a.date_fin else "—" }}</td>
+            <td class="py-3 px-4">
+              {% if a.justifiee %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#c6f6d5] text-[#276749] font-medium">Justifiée</span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Non justifiée</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-right">
+              <div class="inline-flex items-center gap-1.5 justify-end">
+                {% if not a.archivee %}
+                <form method="post" action="/absences/{{ a.id }}/justifier" style="margin:0;">
+                  {{ csrf_input(request) }}
+                  <button type="submit" class="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg {% if a.justifiee %}bg-[#fed7d7] text-[#9b2c2c] hover:bg-[#fbb]{% else %}bg-[#c6f6d5] text-[#276749] hover:bg-[#a7f3d0]{% endif %} text-[12px] font-semibold transition-colors" title="{% if a.justifiee %}Marquer comme non justifiée{% else %}Marquer comme justifiée{% endif %}">
+                    {% if a.justifiee %}
+                    <span class="material-symbols-outlined text-[16px]">cancel</span>
+                    <span>Déjustifier</span>
+                    {% else %}
+                    <span class="material-symbols-outlined text-[16px]">check_circle</span>
+                    <span>Justifier</span>
+                    {% endif %}
+                  </button>
+                </form>
+                {% endif %}
+                <form method="post" action="/absences/{{ a.id }}/archiver" style="margin:0;">
+                  {{ csrf_input(request) }}
+                  <button type="submit" class="inline-flex items-center justify-center w-8 h-8 rounded-lg {% if a.archivee %}text-[#276749] hover:bg-[#c6f6d5]{% else %}text-[#71787f] hover:bg-surface-container-high{% endif %} transition-colors" title="{% if a.archivee %}Réactiver{% else %}Archiver{% endif %}">
+                    <span class="material-symbols-outlined text-[16px]">{% if a.archivee %}unarchive{% else %}archive{% endif %}</span>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 text-center text-on-surface-variant text-[14px]">
+    Aucune absence trouvée pour cette sélection.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

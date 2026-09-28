@@ -1,0 +1,213 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Nouvelle absence{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Enregistrer une absence</div>
+    <div class="page-subtitle">Saisie manuelle d'une absence pour un employé</div>
+  </div>
+  <a href="/absences" class="btn btn-outline">
+    <i class="fas fa-arrow-left"></i> Retour
+  </a>
+</div>
+
+{% if erreur %}
+<div class="alert alert-danger">
+  <span><i class="fas fa-circle-exclamation" style="margin-right:6px;"></i>{{ erreur }}</span>
+</div>
+{% endif %}
+
+<div class="card" style="padding:24px;max-width:900px;">
+  <form method="post" action="/absences/nouvelle" id="form-absence">
+    {{ csrf_input(request) }}
+    <div class="form-grid">
+      <div class="col-span-2">
+        <label class="form-label">Employé concerné *</label>
+        <select name="employe_id" class="form-control" required id="select-employe">
+          <option value="">— Choisir un employé —</option>
+          {% for e in employes %}
+          <option value="{{ e.id }}" data-genre="{{ e.genre or '' }}" {% if valeurs.employe_id == e.id %}selected{% endif %}>
+            {{ e.nom }} {{ e.prenom }} — {{ e.matricule or "sans matricule" }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="form-label">Type d'absence *</label>
+        <select name="type_absence_id" class="form-control" required id="select-type">
+          <option value="">— Choisir —</option>
+          {% for t in types_absence %}
+          <option value="{{ t.id }}"
+                  data-duree="{{ t.duree_standard_jours or '' }}"
+                  data-plafond="{{ t.plafond_jours or '' }}"
+                  data-categorie="{{ t.categorie }}"
+                  data-genre-requis="{{ t.genre_requis or '' }}"
+                  {% if valeurs.type_absence_id == t.id %}selected{% endif %}>
+            {{ t.libelle }}{% if t.duree_standard_jours %} ({{ t.duree_standard_jours }}j){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        <p class="text-muted" id="info-type" style="font-size:12px;margin:4px 0 0;"></p>
+      </div>
+      <div>
+        <label class="form-label">Enregistré par (RH)</label>
+        <input type="text" name="enregistre_par" class="form-control"
+               placeholder="Nom du responsable" value="{{ valeurs.enregistre_par or '' }}">
+      </div>
+
+      <div>
+        <label class="form-label">Date de début *</label>
+        <input type="date" name="date_debut" class="form-control" required value="{{ valeurs.date_debut or '' }}" id="date-debut">
+      </div>
+      <div>
+        <label class="form-label">Date de fin *</label>
+        <input type="date" name="date_fin" class="form-control" required value="{{ valeurs.date_fin or '' }}" id="date-fin">
+      </div>
+
+      <!-- Alerte dynamique -->
+      <div class="col-span-2" id="alerte-deduction" style="display:none;">
+        <div style="background:#FEF3C7;border-left:4px solid #D97706;padding:12px 16px;border-radius:6px;">
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <i class="fas fa-triangle-exclamation" style="color:#D97706;font-size:16px;margin-top:2px;"></i>
+            <div style="font-size:13px;color:#92400E;" id="alerte-texte"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-span-2">
+        <label class="form-label">Motif / Observation</label>
+        <textarea name="motif" class="form-control" rows="3"
+                  placeholder="Raison de l'absence, précisions...">{{ valeurs.motif or '' }}</textarea>
+      </div>
+
+      <div class="col-span-2">
+        <label class="form-label">Statut de justification</label>
+        <select name="justifiee" class="form-control">
+          <option value="" {% if not valeurs.justifiee %}selected{% endif %}>Non justifiée</option>
+          <option value="1" {% if valeurs.justifiee %}selected{% endif %}>Justifiée (justificatif fourni)</option>
+        </select>
+        <p class="text-muted" style="font-size:12px;margin:4px 0 0;">
+          Sélectionnez "Justifiée" si l'employé a fourni un justificatif valide.
+        </p>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px;">
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-save"></i> Enregistrer l'absence
+      </button>
+      <a href="/absences" class="btn btn-outline">Annuler</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  const selectType = document.getElementById('select-type');
+  const selectEmploye = document.getElementById('select-employe');
+  const dateDebut = document.getElementById('date-debut');
+  const dateFin = document.getElementById('date-fin');
+  const infoType = document.getElementById('info-type');
+  const alerteDeduction = document.getElementById('alerte-deduction');
+  const alerteTexte = document.getElementById('alerte-texte');
+
+  // Ajoute N jours à une date (format YYYY-MM-DD)
+  function ajouterJours(dateStr, nbJours) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + nbJours - 1); // -1 car le jour de début compte
+    return d.toISOString().split('T')[0];
+  }
+
+  // Calcule la différence en jours entre 2 dates
+  function diffJours(d1Str, d2Str) {
+    if (!d1Str || !d2Str) return 0;
+    const d1 = new Date(d1Str);
+    const d2 = new Date(d2Str);
+    return Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+  }
+
+  // Quand on change de type : mettre à jour l'info + durée standard
+  function majType() {
+    const option = selectType.options[selectType.selectedIndex];
+    if (!option || !option.value) {
+      infoType.textContent = '';
+      return;
+    }
+
+    const duree = option.getAttribute('data-duree');
+    const plafond = option.getAttribute('data-plafond');
+    const categorie = option.getAttribute('data-categorie');
+    const genreRequis = option.getAttribute('data-genre-requis');
+
+    // Info sur le type
+    let infos = [];
+    if (categorie) infos.push(`Catégorie : ${categorie}`);
+    if (plafond) infos.push(`Plafond : ${plafond}j (au-delà déduit du congé)`);
+    if (genreRequis) infos.push(`Réservé aux ${genreRequis === 'F' ? 'femmes' : 'hommes'}`);
+    infoType.textContent = infos.join(' • ');
+
+    // Pré-remplir la date de fin si durée standard connue
+    if (duree && dateDebut.value) {
+      dateFin.value = ajouterJours(dateDebut.value, parseInt(duree));
+    }
+
+    verifierAlerte();
+  }
+
+  // Vérifier si une alerte doit s'afficher
+  function verifierAlerte() {
+    alerteDeduction.style.display = 'none';
+    alerteTexte.textContent = '';
+
+    const option = selectType.options[selectType.selectedIndex];
+    if (!option || !option.value || !dateDebut.value || !dateFin.value) return;
+
+    const nbJours = diffJours(dateDebut.value, dateFin.value);
+    const dureeStd = parseInt(option.getAttribute('data-duree') || '0');
+    const plafond = parseInt(option.getAttribute('data-plafond') || '0');
+    const categorie = option.getAttribute('data-categorie');
+
+    let messages = [];
+
+    // Cas 1 : Permissions avec plafond (3j) dépassé
+    if (categorie === 'Permission' && plafond && nbJours > plafond) {
+      const depasse = nbJours - plafond;
+      messages.push(`Vous avez saisi ${nbJours} jours, soit ${depasse} jour(s) au-delà du plafond de ${plafond} jours. Ces ${depasse} jour(s) seront <strong>déduits du congé annuel</strong>.`);
+    }
+
+    // Cas 2 : Durée standard dépassée (maternité, paternité...)
+    if (dureeStd && nbJours > dureeStd) {
+      const depasse = nbJours - dureeStd;
+      messages.push(`La durée standard pour ce type est de ${dureeStd} jours. Vous avez saisi ${nbJours} jours, soit ${depasse} jour(s) supplémentaire(s) qui <strong>pourront être déduits du congé annuel</strong>.`);
+    }
+
+    if (messages.length > 0) {
+      alerteTexte.innerHTML = messages.join('<br>');
+      alerteDeduction.style.display = 'block';
+    }
+  }
+
+  // Événements
+  selectType.addEventListener('change', majType);
+  dateDebut.addEventListener('change', function() {
+    const option = selectType.options[selectType.selectedIndex];
+    if (option && option.value) {
+      const duree = option.getAttribute('data-duree');
+      if (duree && dateDebut.value) {
+        dateFin.value = ajouterJours(dateDebut.value, parseInt(duree));
+      }
+    }
+    verifierAlerte();
+  });
+  dateFin.addEventListener('change', verifierAlerte);
+
+  // Initialisation
+  document.addEventListener('DOMContentLoaded', function() {
+    majType();
+    verifierAlerte();
+  });
+</script>
+
+{% endblock %}

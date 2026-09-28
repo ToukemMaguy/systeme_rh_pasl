@@ -1,0 +1,267 @@
+{% extends "_layout.html" %}
+{% block title %}Dossier de licenciement{% endblock %}
+{% block breadcrumb %}Dossier de licenciement n°{{ d.id }}{% endblock %}
+{% block content %}
+{# [ÉTAPE 3] Dossier de licenciement : frise des étapes + sections + actions selon le rôle #}
+{% set champ = "w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" %}
+{% set zone = "w-full px-3 py-2 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" %}
+{% set carte = "bg-surface-container-lowest rounded-xl shadow-sm p-5" %}
+{% set titre = "text-[13px] font-semibold text-primary uppercase tracking-wide mb-4" %}
+{% set etiquette = "text-[11px] text-on-surface-variant uppercase font-semibold" %}
+<div class="flex flex-col gap-4 max-w-4xl">
+
+  <a href="/licenciements" class="text-primary hover:underline font-medium flex items-center gap-1 text-[13px]">
+    <span class="material-symbols-outlined text-[16px]">arrow_back</span> Retour aux dossiers
+  </a>
+
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-[22px] font-semibold text-on-surface">Licenciement — {{ employe.nom }} {{ employe.prenom }}</h1>
+      <p class="text-[13px] text-on-surface-variant mt-0.5">
+        {{ employe.matricule or "Sans matricule" }} · {{ employe.poste.intitule if employe.poste else "" }} · ancienneté {{ anciennete }}
+        · ouvert le {{ d.ouvert_le.strftime("%d/%m/%Y") if d.ouvert_le else "—" }} par {{ d.ouvert_par or "—" }}
+      </p>
+    </div>
+    <span class="inline-flex px-3 py-1 rounded-full text-[12px] font-semibold {{ statuts[d.statut][1] }}">{{ statuts[d.statut][0] }}</span>
+  </div>
+
+  {% if request.query_params.get('ok') %}<div class="px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px]">{{ request.query_params.get('ok') }}</div>{% endif %}
+  {% if request.query_params.get('erreur') %}<div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ request.query_params.get('erreur') }}</div>{% endif %}
+
+  {# ---------- Frise des étapes ---------- #}
+  {% if etape %}
+  <div class="{{ carte }}">
+    <div class="grid grid-cols-6 gap-2">
+      {% for nom in etapes %}
+      {% set n = loop.index %}
+      <div class="flex flex-col items-center text-center gap-1">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold
+                    {{ 'bg-[#38a169] text-white' if n < etape or (n == 6 and employe.statut != 'actif') else ('bg-primary-container text-white' if n == etape else 'bg-surface-container-high text-on-surface-variant') }}">
+          {% if n < etape or (n == 6 and employe.statut != 'actif') %}✓{% else %}{{ n }}{% endif %}
+        </div>
+        <div class="text-[11.5px] {{ 'font-semibold text-on-surface' if n == etape else 'text-on-surface-variant' }}">{{ nom }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if d.statut == "complement" and d.decision_commentaire %}
+  <div class="px-4 py-3 rounded-lg bg-[#FFFBEB] text-[#92400E] text-[13px]">
+    <b>Le Comité de direction demande un complément</b> ({{ d.decide_par }}, {{ d.decide_le.strftime("%d/%m/%Y") }}) : {{ d.decision_commentaire }}
+  </div>
+  {% endif %}
+
+  {# ---------- 1. Faits ---------- #}
+  <div class="{{ carte }}">
+    <div class="{{ titre }}">1. Faits et motif</div>
+    <div class="grid grid-cols-2 gap-4 text-[13.5px]">
+      <div><div class="{{ etiquette }}">Motif</div><div class="mt-1 font-medium">{{ d.type_motif }}</div></div>
+      <div><div class="{{ etiquette }}">Date des faits</div><div class="mt-1">{{ d.date_faits.strftime("%d/%m/%Y") if d.date_faits else "—" }}</div></div>
+      <div class="col-span-2"><div class="{{ etiquette }}">Exposé des faits</div><div class="mt-1 whitespace-pre-line">{{ d.expose_faits or "—" }}</div></div>
+      {% if sanctions_liees %}
+      <div class="col-span-2"><div class="{{ etiquette }}">Sanctions antérieures rattachées</div>
+        <ul class="mt-1 list-disc pl-5">{% for s in sanctions_liees %}<li>{{ s.type_sanction }} du {{ s.date_sanction.strftime("%d/%m/%Y") }} — {{ s.motif or "" }}</li>{% endfor %}</ul></div>
+      {% endif %}
+      {% if d.mise_a_pied_conservatoire %}
+      <div class="col-span-2"><div class="{{ etiquette }}">Mise à pied conservatoire</div>
+        <div class="mt-1">Du {{ d.mise_a_pied_debut.strftime("%d/%m/%Y") if d.mise_a_pied_debut else "—" }} au {{ d.mise_a_pied_fin.strftime("%d/%m/%Y") if d.mise_a_pied_fin else "—" }}</div></div>
+      {% endif %}
+      <div><div class="{{ etiquette }}">Jours de congés restants (à ce jour)</div><div class="mt-1">{{ conges_restants | fmt_nombre }} j</div></div>
+    </div>
+  </div>
+
+  {# ---------- 2 et 3. Conseil de discipline + dossier RH ---------- #}
+  {% if modifiable %}
+  <form method="post" action="/licenciements/{{ d.id }}/enregistrer" enctype="multipart/form-data" class="flex flex-col gap-4">
+    {{ csrf_input(request) }}
+    <div class="{{ carte }}">
+      <div class="{{ titre }}">2. Conseil de discipline</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Date du conseil</label>
+          <input type="date" name="conseil_date" value="{{ d.conseil_date.isoformat() if d.conseil_date else '' }}" class="{{ champ }}"></div>
+        <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Avis du conseil</label>
+          <select name="conseil_avis" class="{{ champ }}" onchange="document.getElementById('sanction-prop').style.display = this.value == 'sanction' ? 'block' : 'none'">
+            <option value="">— Non renseigné —</option>
+            <option value="licenciement" {% if d.conseil_avis == 'licenciement' %}selected{% endif %}>Licenciement</option>
+            <option value="sanction" {% if d.conseil_avis == 'sanction' %}selected{% endif %}>Sanction plus légère</option>
+            <option value="relaxe" {% if d.conseil_avis == 'relaxe' %}selected{% endif %}>Relaxe (aucune sanction)</option>
+          </select></div>
+        <div id="sanction-prop" style="display:{{ 'block' if d.conseil_avis == 'sanction' else 'none' }};">
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Sanction proposée</label>
+          <select name="conseil_sanction_proposee" class="{{ champ }}">
+            {% for s in sanctions_alternatives %}<option value="{{ s }}" {% if d.conseil_sanction_proposee == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select></div>
+        <div class="md:col-span-2"><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Membres présents (noms et fonctions)</label>
+          <textarea name="conseil_membres" rows="2" class="{{ zone }}">{{ d.conseil_membres or '' }}</textarea></div>
+        <div class="md:col-span-2"><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Résumé des échanges / explications de l'employé</label>
+          <textarea name="conseil_resume" rows="3" class="{{ zone }}">{{ d.conseil_resume or '' }}</textarea></div>
+        <div class="md:col-span-2"><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Procès-verbal (PV) signé — PDF ou image</label>
+          {% if d.pv_path %}<div class="text-[13px] mb-1">PV joint : <a href="/{{ d.pv_path }}" target="_blank" class="text-primary underline">consulter</a> (vous pouvez le remplacer)</div>{% endif %}
+          <input type="file" name="pv" accept=".pdf,.jpg,.jpeg,.png" class="text-[13px]"></div>
+      </div>
+    </div>
+
+    <div class="{{ carte }}">
+      <div class="{{ titre }}">3. Dossier RH</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Durée du préavis (jours)</label>
+          <input type="number" min="0" name="preavis_jours" value="{{ d.preavis_jours if d.preavis_jours is not none else '' }}" class="{{ champ }}"
+                 placeholder="{{ 'Non dû pour faute lourde' if d.type_motif == 'Faute lourde' else 'Selon la convention collective' }}">
+          <label class="flex items-center gap-2 text-[12.5px] mt-2"><input type="checkbox" name="preavis_dispense" value="1" {% if d.preavis_dispense %}checked{% endif %}> Dispense de préavis</label></div>
+        <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Avis de la RH</label>
+          <select name="avis_rh" class="{{ champ }}">
+            <option value="">— Non renseigné —</option>
+            <option value="favorable" {% if d.avis_rh == 'favorable' %}selected{% endif %}>Favorable au licenciement</option>
+            <option value="defavorable" {% if d.avis_rh == 'defavorable' %}selected{% endif %}>Défavorable au licenciement</option>
+          </select></div>
+        <div class="md:col-span-2"><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Commentaire de la RH pour le Comité</label>
+          <textarea name="commentaire_rh" rows="3" class="{{ zone }}">{{ d.commentaire_rh or '' }}</textarea></div>
+      </div>
+      <div class="flex justify-end mt-4">
+        <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-5 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold">
+          <span class="material-symbols-outlined text-[18px]">save</span> Enregistrer
+        </button>
+      </div>
+    </div>
+  </form>
+
+  {# Liste de contrôle + transmission #}
+  <div class="{{ carte }}">
+    <div class="{{ titre }}">Avant transmission au Comité de direction</div>
+    <ul class="flex flex-col gap-1.5 text-[13px]">
+      {% for libelle, ok in controle %}
+      <li class="flex items-center gap-2"><span class="material-symbols-outlined text-[18px] {{ 'text-[#38a169]' if ok else 'text-outline' }}">{{ 'check_circle' if ok else 'radio_button_unchecked' }}</span>{{ libelle }}</li>
+      {% endfor %}
+    </ul>
+    <div class="flex flex-wrap gap-3 justify-end mt-4">
+      {% if d.conseil_avis in ('sanction', 'relaxe') %}
+      <form method="post" action="/licenciements/{{ d.id }}/cloturer" onsubmit="return confirm('Clore le dossier sans licenciement ?');">
+        {{ csrf_input(request) }}
+        <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold">
+          <span class="material-symbols-outlined text-[18px]">task_alt</span>
+          {{ "Clore et enregistrer la sanction « " ~ d.conseil_sanction_proposee ~ " »" if d.conseil_avis == 'sanction' else "Clore le dossier (relaxe)" }}
+        </button>
+      </form>
+      {% endif %}
+      <form method="post" action="/licenciements/{{ d.id }}/transmettre">
+        {{ csrf_input(request) }}
+        <button type="submit" {% if not pret_a_transmettre %}disabled title="Complétez la liste ci-dessus"{% endif %}
+                class="inline-flex items-center gap-2 h-[38px] px-5 rounded-lg text-[13px] font-semibold {{ 'bg-primary-container text-white' if pret_a_transmettre else 'bg-surface-container-high text-outline cursor-not-allowed' }}">
+          <span class="material-symbols-outlined text-[18px]">send</span> Transmettre au Comité de direction
+        </button>
+      </form>
+    </div>
+    <details class="mt-4 text-[13px]">
+      <summary class="cursor-pointer text-on-surface-variant">Annuler la procédure</summary>
+      <form method="post" action="/licenciements/{{ d.id }}/annuler" class="flex gap-2 mt-2">
+        {{ csrf_input(request) }}
+        <input type="text" name="motif" required placeholder="Motif de l'annulation" class="{{ champ }}">
+        <button type="submit" class="h-[38px] px-4 rounded-lg bg-[#fed7d7] text-[#9b2c2c] text-[13px] font-semibold whitespace-nowrap">Annuler le dossier</button>
+      </form>
+    </details>
+  </div>
+
+  {% else %}
+  {# ---------- Lecture seule (après transmission, ou pour le Comité) ---------- #}
+  <div class="{{ carte }}">
+    <div class="{{ titre }}">2. Conseil de discipline</div>
+    <div class="grid grid-cols-2 gap-4 text-[13.5px]">
+      <div><div class="{{ etiquette }}">Date</div><div class="mt-1">{{ d.conseil_date.strftime("%d/%m/%Y") if d.conseil_date else "—" }}</div></div>
+      <div><div class="{{ etiquette }}">Avis du conseil</div><div class="mt-1 font-medium">
+        {{ {"licenciement": "Licenciement", "sanction": "Sanction plus légère : " ~ (d.conseil_sanction_proposee or ""), "relaxe": "Relaxe"}.get(d.conseil_avis, "—") }}</div></div>
+      <div class="col-span-2"><div class="{{ etiquette }}">Membres présents</div><div class="mt-1 whitespace-pre-line">{{ d.conseil_membres or "—" }}</div></div>
+      <div class="col-span-2"><div class="{{ etiquette }}">Résumé</div><div class="mt-1 whitespace-pre-line">{{ d.conseil_resume or "—" }}</div></div>
+      <div class="col-span-2"><div class="{{ etiquette }}">Procès-verbal</div><div class="mt-1">{% if d.pv_path %}<a href="/{{ d.pv_path }}" target="_blank" class="text-primary underline font-medium">Consulter le PV</a>{% else %}—{% endif %}</div></div>
+    </div>
+  </div>
+  <div class="{{ carte }}">
+    <div class="{{ titre }}">3. Dossier RH</div>
+    <div class="grid grid-cols-2 gap-4 text-[13.5px]">
+      <div><div class="{{ etiquette }}">Préavis</div><div class="mt-1">
+        {% if d.type_motif == "Faute lourde" %}Non dû (faute lourde){% elif d.preavis_dispense %}Dispense{% elif d.preavis_jours is not none %}{{ d.preavis_jours }} jours{% else %}—{% endif %}</div></div>
+      <div><div class="{{ etiquette }}">Avis de la RH</div><div class="mt-1 font-medium">{{ {"favorable": "Favorable", "defavorable": "Défavorable"}.get(d.avis_rh, "—") }}</div></div>
+      <div class="col-span-2"><div class="{{ etiquette }}">Commentaire de la RH</div><div class="mt-1 whitespace-pre-line">{{ d.commentaire_rh or "—" }}</div></div>
+      {% if d.transmis_le %}<div class="col-span-2 text-[12px] text-on-surface-variant">Transmis au Comité le {{ d.transmis_le.strftime("%d/%m/%Y à %H:%M") }} par {{ d.transmis_par }}</div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ---------- 4. Décision du Comité ---------- #}
+  {% if est_comite and d.statut == "transmis" %}
+  <form method="post" action="/licenciements/{{ d.id }}/decision" class="{{ carte }} border-2 border-primary-container">
+    {{ csrf_input(request) }}
+    <div class="{{ titre }}">4. Décision du Comité de direction</div>
+    <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Commentaire (obligatoire pour rejeter ou demander un complément)</label>
+    <textarea name="commentaire" rows="3" class="{{ zone }}"></textarea>
+    <div class="flex flex-wrap justify-end gap-3 mt-4">
+      <button type="submit" name="decision" value="complement" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-[#FFFBEB] text-[#92400E] text-[13px] font-semibold">
+        <span class="material-symbols-outlined text-[18px]">undo</span> Renvoyer à la RH pour complément</button>
+      <button type="submit" name="decision" value="rejete" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-[#fed7d7] text-[#9b2c2c] text-[13px] font-semibold"
+              onclick="return confirm('Rejeter ce licenciement ?');">
+        <span class="material-symbols-outlined text-[18px]">cancel</span> Rejeter</button>
+      <button type="submit" name="decision" value="approuve" class="inline-flex items-center gap-2 h-[38px] px-5 rounded-lg bg-[#38a169] text-white text-[13px] font-semibold"
+              onclick="return confirm('Approuver le licenciement de {{ employe.prenom }} {{ employe.nom }} ?');">
+        <span class="material-symbols-outlined text-[18px]">check_circle</span> Approuver le licenciement</button>
+    </div>
+  </form>
+  {% elif d.decide_le %}
+  <div class="{{ carte }}">
+    <div class="{{ titre }}">4. Décision du Comité de direction</div>
+    <div class="text-[13.5px]"><b>{{ {"approuve": "Approuvé", "rejete": "Rejeté", "complement": "Renvoyé pour complément"}.get(d.decision, "—") }}</b>
+      — {{ d.decide_par }}, le {{ d.decide_le.strftime("%d/%m/%Y à %H:%M") }}</div>
+    {% if d.decision_commentaire %}<div class="text-[13px] mt-1 italic">« {{ d.decision_commentaire }} »</div>{% endif %}
+  </div>
+  {% endif %}
+
+  {# ---------- 5. Notification ---------- #}
+  {% if est_rh and d.statut == "approuve" %}
+  <div class="{{ carte }} border-2 border-[#38a169]">
+    <div class="{{ titre }}">5. Notification à l'employé</div>
+    <p class="text-[13px] mb-3">1) Téléchargez la lettre, faites-la signer par la Direction et remettez-la à l'employé.
+      2) Renseignez ci-dessous la date de notification et la date de sortie des effectifs.</p>
+    <a href="/licenciements/{{ d.id }}/pdf/lettre" target="_blank" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold mb-4">
+      <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span> Télécharger la lettre de licenciement</a>
+    <form method="post" action="/licenciements/{{ d.id }}/notifier" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {{ csrf_input(request) }}
+      <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Date de notification *</label>
+        <input type="date" name="date_notification" required value="{{ aujourdhui.isoformat() }}" class="{{ champ }}"></div>
+      <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Date de sortie des effectifs *</label>
+        <input type="date" name="date_sortie" required class="{{ champ }}">
+        <div class="text-[11.5px] text-on-surface-variant mt-1">Fin du préavis, ou date de notification en cas de faute lourde ou de dispense. L'employé garde ses accès jusqu'à cette date.</div></div>
+      <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Mode de remise</label>
+        <select name="mode_notification" class="{{ champ }}">{% for m in modes_notification %}<option>{{ m }}</option>{% endfor %}</select></div>
+      <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Lettre signée (scan, facultatif)</label>
+        <input type="file" name="lettre_signee" accept=".pdf,.jpg,.jpeg,.png" class="text-[13px]"></div>
+      <div class="md:col-span-2 flex justify-end">
+        <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-5 rounded-lg bg-[#38a169] text-white text-[13px] font-semibold"
+                onclick="return confirm('Confirmer la notification ? La sortie des effectifs sera programmée à la date indiquée.');">
+          <span class="material-symbols-outlined text-[18px]">mark_email_read</span> Enregistrer la notification</button>
+      </div>
+    </form>
+  </div>
+  {% elif d.statut == "notifie" %}
+  <div class="{{ carte }}">
+    <div class="{{ titre }}">5 et 6. Notification et sortie</div>
+    <div class="grid grid-cols-2 gap-4 text-[13.5px]">
+      <div><div class="{{ etiquette }}">Notifié le</div><div class="mt-1">{{ d.date_notification.strftime("%d/%m/%Y") }} {% if d.mode_notification %}({{ d.mode_notification }}){% endif %}</div></div>
+      <div><div class="{{ etiquette }}">Sortie des effectifs</div><div class="mt-1 font-medium">{{ d.date_sortie.strftime("%d/%m/%Y") }} —
+        {{ "effectuée (accès coupés)" if employe.statut != "actif" else "programmée" }}</div></div>
+      <div><div class="{{ etiquette }}">Congés restants à la sortie (pour la paie)</div><div class="mt-1">{{ d.jours_conges_restants | fmt_nombre }} j</div></div>
+      <div><div class="{{ etiquette }}">Documents</div><div class="mt-1 flex flex-col gap-1">
+        {% if est_rh %}<a href="/licenciements/{{ d.id }}/pdf/lettre" target="_blank" class="text-primary underline">Lettre de licenciement (PDF)</a>{% endif %}
+        {% if d.lettre_signee_path %}<a href="/{{ d.lettre_signee_path }}" target="_blank" class="text-primary underline">Lettre signée</a>{% endif %}
+        {% if est_rh and employe.statut != "actif" %}<a href="/employes/{{ employe.id }}/pdf/certificat" target="_blank" class="text-primary underline">Certificat de travail</a>{% endif %}
+      </div></div>
+    </div>
+  </div>
+  {% elif d.statut == "annule" %}
+  <div class="{{ carte }} text-[13px]"><b>Dossier annulé.</b> Motif : {{ d.motif_annulation }}</div>
+  {% elif d.statut == "clos_sanction" %}
+  <div class="{{ carte }} text-[13px]"><b>Dossier clos sans licenciement.</b> La sanction « {{ d.conseil_sanction_proposee }} » a été ajoutée à
+    <a href="/employes/{{ employe.id }}?onglet=disciplinaire" class="text-primary underline">l'historique disciplinaire</a>.</div>
+  {% elif d.statut == "clos_relaxe" %}
+  <div class="{{ carte }} text-[13px]"><b>Dossier clos : relaxe</b> décidée par le conseil de discipline.</div>
+  {% endif %}
+</div>
+{% endblock %}

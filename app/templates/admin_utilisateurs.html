@@ -1,0 +1,188 @@
+{% extends "_layout.html" %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Comptes utilisateurs</div>
+    <div class="page-subtitle">Gestion des accès à l'application PASL-RH</div>
+  </div>
+  <a href="/admin" class="btn btn-outline">
+    <i class="fas fa-arrow-left"></i> Retour à l'administration
+  </a>
+</div>
+
+{% if request.query_params.get('ok') %}
+<div class="alert alert-success">
+  <span><i class="fas fa-circle-check" style="margin-right:6px;"></i>{{ request.query_params.get('ok') }}</span>
+  <button class="alert-close" onclick="this.parentElement.style.display='none'">&times;</button>
+</div>
+{% endif %}
+{% if request.query_params.get('erreur') %}
+<div class="alert alert-danger">
+  <span><i class="fas fa-circle-exclamation" style="margin-right:6px;"></i>{{ request.query_params.get('erreur') }}</span>
+  <button class="alert-close" onclick="this.parentElement.style.display='none'">&times;</button>
+</div>
+{% endif %}
+
+{# [LOT 1 - POINT 3] Mot de passe provisoire : affiché UNE seule fois, jamais enregistré en clair #}
+{% if mot_de_passe_provisoire %}
+<div class="alert alert-success" style="display:block;">
+  <div style="font-weight:700;margin-bottom:4px;"><i class="fas fa-key" style="margin-right:6px;"></i>Mot de passe provisoire pour {{ mot_de_passe_provisoire.email }}</div>
+  <div style="font-family:monospace;font-size:18px;letter-spacing:1px;margin:6px 0;">{{ mot_de_passe_provisoire.mdp }}</div>
+  <div style="font-size:12.5px;">Transmettez-le à l'utilisateur de vive voix ou par un canal sûr. Il ne sera plus affiché après avoir quitté cette page.
+  L'utilisateur pourra ensuite le remplacer par un mot de passe personnel depuis l'icône 🔑 du menu (conseillé, non obligatoire).</div>
+</div>
+{% endif %}
+
+<div class="dashboard-grid" style="grid-template-columns:1.2fr 1fr;margin-bottom:24px;">
+
+  <div class="card" style="padding:22px;">
+    <div class="section-title">
+      <i class="fas fa-user-plus" style="color:var(--blue-accent);margin-right:8px;"></i>Nouveau compte
+    </div>
+    <form method="post" action="/admin/utilisateurs/nouveau" class="form-grid">
+      {{ csrf_input(request) }}
+      <div class="col-span-2">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-control" required autocomplete="off">
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Nom affiché</label>
+        <input type="text" name="nom" class="form-control" required autocomplete="off">
+      </div>
+      <div>
+        <label class="form-label">Mot de passe</label>
+        <input type="password" name="mot_de_passe" class="form-control" required minlength="{{ longueur_min }}" autocomplete="new-password">
+        <small class="text-muted" style="font-size:12px;">{{ longueur_min }} caractères minimum, lettres et chiffres. L'utilisateur pourra le changer depuis l'icône 🔑 du menu.</small>
+      </div>
+      <div>
+        <label class="form-label">Rôle</label>
+        <select name="role" class="form-control" required>
+          {% for r in roles %}
+          <option value="{{ r }}">{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Employé rattaché <span class="text-muted" style="font-weight:400;">(obligatoire pour un rôle Employé)</span></label>
+        <select name="employe_id" class="form-control">
+          <option value="">— Aucun —</option>
+          {% for e in employes_disponibles %}
+          <option value="{{ e.id }}">{{ e.nom }} {{ e.prenom }}{% if e.matricule %} — {{ e.matricule }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-span-2">
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+          <i class="fas fa-plus"></i> Créer le compte
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card" style="padding:22px;">
+    <div class="section-title">
+      <i class="fas fa-info-circle" style="color:var(--blue-accent);margin-right:8px;"></i>Rôles disponibles
+    </div>
+    <div style="font-size:13px;line-height:1.7;color:var(--text);">
+      <p style="margin:0 0 10px;"><strong style="color:var(--navy);">Administrateur</strong><br>Gestion des comptes utilisateurs et des référentiels (départements, agences, postes, grades). Aucun accès aux fiches employés.</p>
+      <p style="margin:0 0 10px;"><strong style="color:var(--navy);">Chef RH</strong><br>Accès complet RH : employés, validation des demandes, départs, licenciements, PDF, dashboard.</p>
+      <p style="margin:0 0 10px;"><strong style="color:var(--navy);">Assistant RH</strong><br>Création/modification de fiches, saisie de demandes, validation des permissions si justificatif fourni. Pas de validation de départ, pas de comptes, pas de référentiels.</p>
+      <p style="margin:0 0 10px;"><strong style="color:var(--navy);">Comité de direction</strong><br>Lecture seule : dashboard, statistiques, fiches employés, absences.</p>
+      <p style="margin:0;"><strong style="color:var(--navy);">Employé</strong><br>Accès uniquement à son espace personnel (demandes, congés, historique).</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="card table-wrapper">
+  <div class="card-header">
+    <h3><i class="fas fa-users-gear" style="color:var(--blue-accent);margin-right:8px;"></i>Comptes existants ({{ utilisateurs|length }})</h3>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Nom</th>
+        <th>Rôle</th>
+        <th>Employé rattaché</th>
+        <th>État</th>
+        <th style="text-align:center;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in utilisateurs %}
+      <tr>
+        <td style="font-weight:600;">{{ u.email }}</td>
+        <td>{{ u.nom }}</td>
+        <td>
+          <form method="post" action="/admin/utilisateurs/{{ u.id }}/role" style="margin:0;">
+            {{ csrf_input(request) }}
+            <select name="nouveau_role" class="form-control" style="padding:5px 28px 5px 10px;font-size:12.5px;width:auto;min-width:160px;" onchange="this.form.submit()">
+              {% for r in roles %}
+              <option value="{{ r }}" {% if u.role == r %}selected{% endif %}>{{ r }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+        <td>
+          {% if u.employe %}
+            {{ u.employe.nom }} {{ u.employe.prenom }}
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12.5px;">
+          {% if not u.compte_actif %}
+            <span style="color:#4a5568;font-weight:600;" title="{{ u.motif_desactivation or '' }}"><i class="fas fa-user-slash"></i> Désactivé{% if u.desactive_le %} le {{ u.desactive_le.strftime("%d/%m/%Y") }}{% endif %}</span>
+            {% if u.motif_desactivation %}<div class="text-muted" style="font-size:11.5px;">{{ u.motif_desactivation }}</div>{% endif %}
+          {% elif u.bloque_jusqua and u.bloque_jusqua > maintenant %}
+            <span style="color:#9b2c2c;font-weight:600;"><i class="fas fa-lock"></i> Bloqué jusqu'à {{ u.bloque_jusqua.strftime("%H:%M") }}</span>
+          {% elif u.doit_changer_mdp %}
+            <span style="color:#975a16;"><i class="fas fa-key"></i> Mot de passe provisoire</span>
+          {% else %}
+            <span style="color:#276749;"><i class="fas fa-circle-check"></i> Actif</span>
+          {% endif %}
+        </td>
+        <td style="text-align:center;white-space:nowrap;">
+          {% if u.bloque_jusqua and u.bloque_jusqua > maintenant %}
+          <form method="post" action="/admin/utilisateurs/{{ u.id }}/debloquer" class="d-inline">
+            {{ csrf_input(request) }}
+            <button type="submit" class="btn btn-sm btn-outline" title="Débloquer"><i class="fas fa-lock-open"></i></button>
+          </form>
+          {% endif %}
+          {% if u.id != request.session.get('user_id') %}
+          {% if u.compte_actif %}
+          <form method="post" action="/admin/utilisateurs/{{ u.id }}/desactiver" class="d-inline"
+                onsubmit="return confirm('Désactiver le compte « {{ u.email }} » ? L\'utilisateur sera déconnecté et ne pourra plus se connecter.');">
+            {{ csrf_input(request) }}
+            <button type="submit" class="btn btn-sm btn-outline" title="Désactiver l'accès"><i class="fas fa-user-slash"></i></button>
+          </form>
+          {% else %}
+          <form method="post" action="/admin/utilisateurs/{{ u.id }}/reactiver" class="d-inline">
+            {{ csrf_input(request) }}
+            <button type="submit" class="btn btn-sm btn-outline" title="Réactiver l'accès"><i class="fas fa-user-check"></i></button>
+          </form>
+          {% endif %}
+          <form method="post" action="/admin/utilisateurs/{{ u.id }}/reinitialiser" class="d-inline"
+                onsubmit="return confirm('Générer un nouveau mot de passe provisoire pour « {{ u.email }} » ? L\'ancien ne fonctionnera plus.');">
+            {{ csrf_input(request) }}
+            <button type="submit" class="btn btn-sm btn-outline" title="Réinitialiser le mot de passe"><i class="fas fa-key"></i></button>
+          </form>
+          {% endif %}
+          <form method="post" action="/admin/utilisateurs/{{ u.id }}/supprimer" class="d-inline"
+                onsubmit="return confirm('Supprimer le compte « {{ u.email }} » ? Cette action est irréversible.');">
+            {{ csrf_input(request) }}
+            <button type="submit" class="btn btn-sm btn-danger" title="Supprimer"><i class="fas fa-trash"></i></button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not utilisateurs %}
+      <tr><td colspan="6" class="text-muted" style="text-align:center;padding:20px;">Aucun compte utilisateur.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

@@ -1,0 +1,704 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Tableau de bord{% endblock %}
+{% block content %}
+<div class="flex flex-col w-full">
+
+  <!-- ============================================================ -->
+  <!-- EN-TÊTE DE BIENVENUE                                          -->
+  <!-- ============================================================ -->
+  <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+    <div>
+      <div class="flex items-center gap-1.5 text-primary font-caption text-caption uppercase tracking-wider mb-1">
+        <span class="inline-block w-2 h-2 rounded-full bg-secondary"></span>
+        <span>{{ date_aujourdhui }}</span>
+      </div>
+      <h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Tableau de bord RH</h1>
+            {% if periode_active_label %}
+      <div class="inline-flex items-center gap-2 mt-2 px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container text-[12px] font-medium">
+        <span class="material-symbols-outlined text-[14px]">calendar_month</span>
+        <span>Période : {{ periode_active_label }}</span>
+      </div>
+      {% endif %}
+      <p class="font-body-md text-body-md text-on-surface-variant mt-0.5">
+        Panafrican SL —
+        <span class="font-semibold text-on-surface">{{ effectif_total }} collaborateurs actifs</span>
+        répartis sur {{ nb_agences }} agence{{ 's' if nb_agences > 1 else '' }}
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" onclick="document.getElementById('barre-filtres').classList.toggle('hidden')"
+              class="h-9 px-4 bg-surface-container-lowest text-on-surface shadow-sm rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-surface-container-low transition-colors">
+        <span class="material-symbols-outlined text-[18px] text-outline">tune</span>
+        <span>Filtres</span>
+        {% if filtres_actifs %}
+        <span class="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[11px] font-bold">{{ filtres_actifs|length }}</span>
+        {% endif %}
+      </button>
+      <div class="relative">
+        <button type="button" onclick="document.getElementById('menu-export').classList.toggle('hidden')"
+                class="h-9 px-4 bg-primary text-on-primary shadow-sm rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-primary-container transition-colors">
+          <span class="material-symbols-outlined text-[18px]">download</span>
+          <span>Exporter le rapport</span>
+          <span class="material-symbols-outlined text-[16px]">expand_more</span>
+        </button>
+        <div id="menu-export" class="hidden absolute right-0 top-full mt-1 bg-surface-container-lowest rounded-lg shadow-lg border border-surface-container-high z-50 min-w-[240px] overflow-hidden">
+          <a href="/export/dashboard.xlsx{{ request.url.query and '?' ~ request.url.query or '' }}"
+             class="flex items-center gap-2 px-4 py-2.5 text-[13px] text-on-surface hover:bg-surface-container-low transition-colors">
+            <span class="material-symbols-outlined text-[18px] text-emerald-700">table_view</span>
+            <span>Rapport Excel complet</span>
+          </a>
+          <a href="/export/dashboard.pdf{{ request.url.query and '?' ~ request.url.query or '' }}"
+             class="flex items-center gap-2 px-4 py-2.5 text-[13px] text-on-surface hover:bg-surface-container-low transition-colors border-t border-surface-container-high">
+            <span class="material-symbols-outlined text-[18px] text-rose-700">picture_as_pdf</span>
+            <span>Export PDF (à venir)</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- BARRE DE FILTRES MULTICRITÈRES                                -->
+  <!-- ============================================================ -->
+  <div id="barre-filtres" class="{% if not filtres_actifs %}hidden{% endif %} bg-surface-container-lowest rounded-xl shadow-sm p-4 mb-6">
+    <form method="get" action="/" id="form-filtres" class="flex flex-col gap-4">
+
+      <!-- Ligne 1 : Période + bouton Réinitialiser -->
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2 text-primary font-semibold text-[13px]">
+          <span class="material-symbols-outlined text-[18px]">calendar_month</span>
+          <span>Période</span>
+        </div>
+
+        <div class="flex flex-wrap gap-1.5">
+          {% set periodes = [
+            ('7j', '7 jours'),
+            ('30j', '30 jours'),
+            ('90j', '90 jours'),
+            ('mois', 'Ce mois'),
+            ('trimestre', 'Ce trimestre'),
+            ('annee', 'Cette année'),
+            ('12m', '12 mois'),
+            ('perso', 'Personnalisé')
+          ] %}
+          {% for cle, libelle in periodes %}
+          <label class="cursor-pointer">
+            <input type="radio" name="periode" value="{{ cle }}" class="peer sr-only"
+                   {% if periode == cle %}checked{% endif %}
+                   onchange="this.form.submit()">
+            <span class="inline-flex items-center h-8 px-3 rounded-lg text-[12.5px] font-medium transition-colors
+                         bg-surface-container-low text-on-surface-variant hover:bg-surface-container
+                         peer-checked:bg-primary peer-checked:text-white">
+              {{ libelle }}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Ligne 2 : Dates personnalisées (visible seulement si periode=perso) -->
+      <div id="bloc-dates-perso" class="{% if periode != 'perso' %}hidden{% endif %} flex flex-wrap items-center gap-3 pl-8">
+        <label class="text-[12.5px] text-on-surface-variant font-medium">Du</label>
+        <input type="date" name="date_debut" value="{{ date_debut or '' }}"
+               class="h-8 px-2 bg-surface-container-low rounded-lg text-[12.5px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+        <label class="text-[12.5px] text-on-surface-variant font-medium">au</label>
+        <input type="date" name="date_fin" value="{{ date_fin or '' }}"
+               class="h-8 px-2 bg-surface-container-low rounded-lg text-[12.5px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+        <button type="submit" class="h-8 px-3 rounded-lg bg-primary text-white text-[12.5px] font-semibold hover:bg-primary-container transition-colors">
+          Appliquer
+        </button>
+      </div>
+
+      <!-- Ligne 3 : Filtres multicritères -->
+      <div class="flex flex-wrap items-center gap-3 pt-3 border-t border-surface-container-high">
+        <div class="flex items-center gap-2 text-primary font-semibold text-[13px]">
+          <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+          <span>Critères</span>
+        </div>
+
+        <!-- Agence -->
+        <select name="agence_id" onchange="this.form.submit()"
+                class="h-8 px-2 bg-surface-container-low rounded-lg text-[12.5px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+          <option value="">Toutes les agences</option>
+          {% for a in agences_filtre %}
+          <option value="{{ a.id }}" {% if agence_id == a.id|string %}selected{% endif %}>{{ a.nom }}</option>
+          {% endfor %}
+        </select>
+
+        <!-- Département -->
+        <select name="departement_id" onchange="this.form.submit()"
+                class="h-8 px-2 bg-surface-container-low rounded-lg text-[12.5px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+          <option value="">Tous les départements</option>
+          {% for d in departements_filtre %}
+          <option value="{{ d.id }}" {% if departement_id == d.id|string %}selected{% endif %}>{{ d.nom }}</option>
+          {% endfor %}
+        </select>
+
+        <!-- Genre -->
+        <select name="genre" onchange="this.form.submit()"
+                class="h-8 px-2 bg-surface-container-low rounded-lg text-[12.5px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+          <option value="">Tous genres</option>
+          <option value="H" {% if genre == 'H' %}selected{% endif %}>Hommes</option>
+          <option value="F" {% if genre == 'F' %}selected{% endif %}>Femmes</option>
+        </select>
+
+        <!-- Poste -->
+        <select name="poste_id" onchange="this.form.submit()"
+                class="h-8 px-2 bg-surface-container-low rounded-lg text-[12.5px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+          <option value="">Tous les postes</option>
+          {% for p in postes_filtre %}
+          <option value="{{ p.id }}" {% if poste_id == p.id|string %}selected{% endif %}>{{ p.intitule }}</option>
+          {% endfor %}
+        </select>
+
+        <!-- Grade -->
+        <select name="grade_id" onchange="this.form.submit()"
+                class="h-8 px-2 bg-surface-container-low rounded-lg text-[12.5px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+          <option value="">Tous les grades</option>
+          {% for g in grades_filtre %}
+          <option value="{{ g.id }}" {% if grade_id == g.id|string %}selected{% endif %}>{{ g.libelle }}</option>
+          {% endfor %}
+        </select>
+
+        <!-- Réinitialiser -->
+        <a href="/" class="ml-auto inline-flex items-center gap-1 h-8 px-3 rounded-lg text-[12.5px] font-medium text-on-surface-variant hover:bg-surface-container transition-colors">
+          <span class="material-symbols-outlined text-[16px]">refresh</span>
+          <span>Réinitialiser</span>
+        </a>
+      </div>
+    </form>
+
+    <!-- Badges des filtres actifs -->
+    {% if filtres_actifs %}
+    <div class="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-surface-container-high">
+      <span class="text-[11.5px] text-on-surface-variant uppercase tracking-wider font-semibold">Filtres actifs :</span>
+      {% for f in filtres_actifs %}
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-[11.5px] font-medium">
+        {{ f.label }}
+        <a href="{{ f.url_retrait }}" class="hover:opacity-70 transition-opacity">
+          <span class="material-symbols-outlined text-[14px]">close</span>
+        </a>
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 4 KPI GLOBAUX                                                 -->
+  <!-- ============================================================ -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+
+    <!-- KPI 1 : Employés actifs -->
+    <div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex items-center justify-between">
+      <div class="flex flex-col min-w-0">
+        <span class="font-label-sm text-label-sm text-on-surface-variant">Employés actifs</span>
+        <span class="font-headline-lg text-headline-lg text-on-surface font-bold mt-1">{{ effectif_total }}</span>
+        <span class="font-caption text-caption text-on-surface-variant/80 mt-1 truncate">
+          {{ nb_departements }} département{{ 's' if nb_departements > 1 else '' }} opérationnel{{ 's' if nb_departements > 1 else '' }}
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center text-primary flex-shrink-0">
+        <span class="material-symbols-outlined text-[24px]">group</span>
+      </div>
+    </div>
+
+    <!-- KPI 2 : Demandes en attente -->
+    <div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex items-center justify-between">
+      <div class="flex flex-col min-w-0">
+        <span class="font-label-sm text-label-sm text-on-surface-variant">Demandes en attente</span>
+        <span class="font-headline-lg text-headline-lg text-on-surface font-bold mt-1">{{ demandes_en_attente }}</span>
+        <div class="mt-1">
+          {% if demandes_en_attente > 0 %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-amber-50 text-amber-700 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            Action requise
+          </span>
+          {% else %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-emerald-50 text-emerald-700 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            À jour
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 flex-shrink-0">
+        <span class="material-symbols-outlined text-[24px]">hourglass_top</span>
+      </div>
+    </div>
+
+        <!-- KPI 3 : Embauches (période personnalisable) -->
+    <div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex items-stretch gap-2">
+      <div class="flex flex-col min-w-0 flex-1">
+        <span class="font-label-sm text-label-sm text-on-surface-variant">Embauches</span>
+        <span class="font-headline-lg text-headline-lg text-on-surface font-bold mt-1">{{ nouvelles_embauches }}</span>
+        <div class="flex items-center gap-1 font-label-sm text-label-sm text-emerald-600 mt-1 font-medium">
+          <span class="material-symbols-outlined text-[16px]">trending_up</span>
+          <span class="truncate">{{ libelle_periode_embauches }}</span>
+        </div>
+      </div>
+
+      <div class="flex flex-col items-end justify-between flex-shrink-0">
+        <div class="relative">
+          <select form="form-filtres" name="periode_embauches"
+                  onchange="document.getElementById('form-filtres').submit()"
+                  class="text-[10.5px] font-semibold bg-surface-container-low hover:bg-surface-container text-on-surface-variant rounded-full pl-2.5 pr-6 py-1 cursor-pointer appearance-none focus:outline-none focus:ring-1 focus:ring-primary/30">
+            {% for cle, lib in [('7j','7j'),('30j','30j'),('90j','90j'),('mois','Mois'),('trimestre','Trim.'),('annee','Année'),('12m','12m')] %}
+            <option value="{{ cle }}" {% if periode_embauches == cle %}selected{% endif %}>{{ lib }}</option>
+            {% endfor %}
+          </select>
+          <span class="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[14px] text-on-surface-variant pointer-events-none">expand_more</span>
+        </div>
+
+        <div class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-800">
+          <span class="material-symbols-outlined text-[24px]">person_add</span>
+        </div>
+      </div>
+    </div>
+      <!-- KPI 4 : Départs (période personnalisable) -->
+    <div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex items-stretch gap-2">
+      <div class="flex flex-col min-w-0 flex-1">
+        <span class="font-label-sm text-label-sm text-on-surface-variant">Départs</span>
+        <span class="font-headline-lg text-headline-lg text-on-surface font-bold mt-1">{{ departs_recents }}</span>
+        <span class="font-caption text-caption text-on-surface-variant/80 mt-1 truncate">
+          {{ libelle_periode_departs }}
+        </span>
+      </div>
+
+      <div class="flex flex-col items-end justify-between flex-shrink-0">
+        <div class="relative">
+          <select form="form-filtres" name="periode_departs"
+                  onchange="document.getElementById('form-filtres').submit()"
+                  class="text-[10.5px] font-semibold bg-surface-container-low hover:bg-surface-container text-on-surface-variant rounded-full pl-2.5 pr-6 py-1 cursor-pointer appearance-none focus:outline-none focus:ring-1 focus:ring-primary/30">
+            {% for cle, lib in [('7j','7j'),('30j','30j'),('90j','90j'),('mois','Mois'),('trimestre','Trim.'),('annee','Année'),('12m','12m')] %}
+            <option value="{{ cle }}" {% if periode_departs == cle %}selected{% endif %}>{{ lib }}</option>
+            {% endfor %}
+          </select>
+          <span class="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[14px] text-on-surface-variant pointer-events-none">expand_more</span>
+        </div>
+
+        <div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant">
+          <span class="material-symbols-outlined text-[24px]">person_remove</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI 5 : Absents aujourd'hui -->
+    <div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex items-center justify-between">
+      <div class="flex flex-col min-w-0">
+        <span class="font-label-sm text-label-sm text-on-surface-variant">Absents aujourd'hui</span>
+        <span class="font-headline-lg text-headline-lg text-on-surface font-bold mt-1">{{ absents_aujourdhui }}</span>
+        <div class="mt-1">
+          {% if absents_aujourdhui > 0 %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-orange-50 text-orange-700 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+            En cours
+          </span>
+          {% else %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-emerald-50 text-emerald-700 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Aucun absent
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-800 flex-shrink-0">
+        <span class="material-symbols-outlined text-[24px]">event_busy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 nouveaux KPI : Turnover + Départs à venir -->
+
+      <!-- 2 nouveaux KPI : Turnover + Départs à venir -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+    <!-- Turnover (période personnalisable, 12m par défaut) -->
+    <div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex items-stretch gap-2">
+      <div class="flex flex-col min-w-0 flex-1">
+        <span class="font-label-sm text-label-sm text-on-surface-variant">Turnover</span>
+        <span class="font-headline-lg text-headline-lg text-on-surface font-bold mt-1">{{ turnover }}%</span>
+        <span class="font-caption text-caption text-on-surface-variant/80 mt-1 truncate">
+          {{ departs_12_mois }} départ{{ 's' if departs_12_mois > 1 else '' }} · {{ libelle_periode_turnover }}
+        </span>
+      </div>
+
+      <div class="flex flex-col items-end justify-between flex-shrink-0">
+        <div class="relative">
+          <select form="form-filtres" name="periode_turnover"
+                  onchange="document.getElementById('form-filtres').submit()"
+                  class="text-[10.5px] font-semibold bg-surface-container-low hover:bg-surface-container text-on-surface-variant rounded-full pl-2.5 pr-6 py-1 cursor-pointer appearance-none focus:outline-none focus:ring-1 focus:ring-primary/30">
+            {% for cle, lib in [('7j','7j'),('30j','30j'),('90j','90j'),('mois','Mois'),('trimestre','Trim.'),('annee','Année'),('12m','12m')] %}
+            <option value="{{ cle }}" {% if periode_turnover == cle %}selected{% endif %}>{{ lib }}</option>
+            {% endfor %}
+          </select>
+          <span class="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[14px] text-on-surface-variant pointer-events-none">expand_more</span>
+        </div>
+
+        <div class="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-rose-800">
+          <span class="material-symbols-outlined text-[24px]">trending_down</span>
+        </div>
+      </div>
+    </div>
+    <!-- Départs retraite à venir -->
+    <div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex items-center justify-between">
+      <div class="flex flex-col min-w-0">
+        <span class="font-label-sm text-label-sm text-on-surface-variant">Départs retraite (6 mois)</span>
+        <span class="font-headline-lg text-headline-lg text-on-surface font-bold mt-1">{{ employes_retraite|length }}</span>
+        <div class="mt-1">
+          {% if employes_retraite %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-amber-50 text-amber-700 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            À anticiper
+          </span>
+          {% else %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-emerald-50 text-emerald-700 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Aucun
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-800 flex-shrink-0">
+        <span class="material-symbols-outlined text-[24px]">elderly</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- DEMANDES PAR TYPE D'ACTION RH                                -->
+  <!-- ============================================================ -->
+  {% if cartes_types %}
+  <div class="mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary text-[20px]">splitscreen</span>
+        <h2 class="font-headline-md text-headline-md text-on-surface">Demandes par type d'action RH</h2>
+      </div>
+      <span class="font-caption text-caption text-on-surface-variant uppercase tracking-wider">Mise à jour en temps réel</span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {% for c in cartes_types %}
+      <div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-lg {{ c.couleur_bg }} flex items-center justify-center {{ c.couleur_txt }}">
+              <span class="material-symbols-outlined text-[22px]">{{ c.icone }}</span>
+            </div>
+            {% if c.en_attente > 0 %}
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full font-label-sm text-label-sm font-semibold bg-amber-50 text-amber-800">
+              {{ c.en_attente }} en attente
+            </span>
+            {% else %}
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full font-label-sm text-label-sm font-semibold bg-emerald-50 text-emerald-700">
+              À jour
+            </span>
+            {% endif %}
+          </div>
+          <span class="font-headline-sm text-headline-sm text-on-surface block">{{ c.libelle }}</span>
+          <p class="font-body-sm text-body-sm text-on-surface-variant mt-1">
+            Total : <strong class="text-on-surface">{{ c.total_mois }}</strong> ce mois
+          </p>
+        </div>
+        <div class="mt-4 pt-3 flex items-center justify-between">
+          <span class="font-caption text-caption text-outline">{{ c.priorite }}</span>
+          <a href="/demandes?type={{ c.libelle }}" class="inline-flex items-center gap-1 font-label-sm text-label-sm text-primary font-semibold hover:text-secondary transition-colors">
+            <span>{{ c.action }}</span>
+            <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ============================================================ -->
+  <!-- GRAPHIQUES : Départements + Agences                          -->
+  <!-- ============================================================ -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-6">
+
+    <!-- Effectif par département (7 colonnes) -->
+    <div class="lg:col-span-7 bg-surface-container-lowest rounded-xl p-6 shadow-sm flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="font-headline-md text-headline-md text-on-surface">Effectif par département</h3>
+            <p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Distribution opérationnelle sur l'ensemble des pôles</p>
+          </div>
+          {% if repartition_departements %}
+          <span class="font-caption text-caption px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-medium">
+            {{ repartition_departements[0].count }} max
+          </span>
+          {% endif %}
+        </div>
+        <div class="flex flex-col gap-3.5">
+          {% for d in repartition_departements %}
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between font-body-sm text-body-sm">
+              <span class="font-medium text-on-surface">{{ d.nom }}</span>
+              <span class="text-on-surface-variant"><strong class="text-on-surface">{{ d.count }}</strong> ({{ d.pourcentage }}%)</span>
+            </div>
+            <div class="h-2.5 w-full bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full rounded-full" style="width: {{ d.largeur }}%; background-color: {{ d.couleur }};"></div>
+            </div>
+          </div>
+          {% endfor %}
+          {% if not repartition_departements %}
+          <p class="text-on-surface-variant text-[13px]">Aucun département avec employés actifs.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Répartition par agence (5 colonnes) -->
+    <div class="lg:col-span-5 bg-surface-container-lowest rounded-xl p-6 shadow-sm flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-headline-md text-headline-md text-on-surface">Répartition par agence</h3>
+          <span class="font-caption text-caption text-outline">{{ nb_agences }} implantation{{ 's' if nb_agences > 1 else '' }}</span>
+        </div>
+        <p class="font-body-sm text-body-sm text-on-surface-variant mb-4">Densité d'effectif sur le territoire</p>
+        <div class="flex items-center justify-center py-2">
+          <div class="relative w-44 h-44 flex items-center justify-center">
+            <svg class="w-full h-full transform -rotate-90" viewbox="0 0 36 36">
+              <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#e7eefe" stroke-width="4.2"></circle>
+              {% for s in segments_agences %}
+              <circle cx="18" cy="18" r="15.9155" fill="none" stroke="{{ s.couleur }}" stroke-width="4.2"
+                      stroke-dasharray="{{ s.pourcentage }} 100"
+                      stroke-dashoffset="{{ -s.debut }}"></circle>
+              {% endfor %}
+            </svg>
+            <div class="absolute flex flex-col items-center justify-center text-center pointer-events-none">
+              <span class="font-headline-lg text-headline-lg font-bold text-on-surface leading-none">{{ effectif_total }}</span>
+              <span class="font-caption text-caption uppercase text-on-surface-variant tracking-wider mt-0.5">Collaborateurs</span>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-x-3 gap-y-2 mt-4 pt-2">
+          {% for s in segments_agences %}
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {{ s.couleur }};"></span>
+            <span class="font-body-sm text-body-sm text-on-surface truncate">{{ s.nom }}</span>
+            <span class="font-label-sm text-label-sm font-semibold ml-auto text-on-surface">{{ s.count }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+    <!-- Pyramide des âges + Top 5 postes -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-6">
+    <!-- Pyramide des âges (7 colonnes) -->
+    <div class="lg:col-span-7 bg-surface-container-lowest rounded-xl p-6 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="font-headline-md text-headline-md text-on-surface">Pyramide des âges</h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Répartition des {{ effectif_total }} employés actifs</p>
+        </div>
+      </div>
+      <div class="flex flex-col gap-3.5">
+        {% for p in pyramide_ages %}
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between font-body-sm text-body-sm">
+            <span class="font-medium text-on-surface">{{ p.tranche }} ans</span>
+            <span class="text-on-surface-variant"><strong class="text-on-surface">{{ p.count }}</strong> ({{ p.pourcentage }}%)</span>
+          </div>
+          <div class="h-2.5 w-full bg-surface-container rounded-full overflow-hidden">
+            <div class="h-full rounded-full bg-primary" style="width: {{ p.pourcentage }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Top 5 des postes (5 colonnes) -->
+    <div class="lg:col-span-5 bg-surface-container-lowest rounded-xl p-6 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="font-headline-md text-headline-md text-on-surface">Top 5 des postes</h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Postes les plus représentés</p>
+        </div>
+      </div>
+      <div class="flex flex-col gap-3">
+        {% for nom, count in top_postes %}
+        <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0">
+          <span class="font-body-sm text-body-sm text-on-surface truncate">{{ nom }}</span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-secondary-fixed text-on-secondary-fixed font-semibold">{{ count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TABLEAU DES DEMANDES RÉCENTES                                -->
+  <!-- ============================================================ -->
+  <!-- Départs à venir (retraites) -->
+  {% if employes_retraite %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden mb-6">
+    <div class="p-4 flex items-center justify-between">
+      <div>
+        <h3 class="font-headline-md text-headline-md text-on-surface">Départs à la retraite à venir</h3>
+        <p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Employés atteignant 60 ans dans les 6 prochains mois</p>
+      </div>
+      <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full font-label-sm text-label-sm bg-amber-50 text-amber-700 font-semibold">
+        <span class="material-symbols-outlined text-[16px]">warning</span>
+        {{ employes_retraite|length }} à anticiper
+      </span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Employé</th>
+            <th class="py-3 px-4">Poste</th>
+            <th class="py-3 px-4">Département</th>
+            <th class="py-3 px-4">Date de retraite</th>
+            <th class="py-3 px-4 text-center">Jours restants</th>
+          </tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for r in employes_retraite %}
+          <tr class="border-t border-surface-container-high hover:bg-surface-container-low/40">
+            <td class="py-3 px-4 font-medium">{{ r.employe.nom }} {{ r.employe.prenom }}</td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ r.employe.poste.intitule if r.employe.poste else "—" }}</td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ r.employe.departement.nom if r.employe.departement else "—" }}</td>
+            <td class="py-3 px-4 font-medium">{{ r.date_retraite.strftime("%d/%m/%Y") }}</td>
+            <td class="py-3 px-4 text-center">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-rose-50 text-rose-700 font-semibold">{{ r.jours_restants }} jours</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden mb-6">
+    <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h3 class="font-headline-md text-headline-md text-on-surface">Demandes récentes nécessitant validation</h3>
+        <p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Dossiers prioritaires soumis dans le circuit administratif RH</p>
+      </div>
+      <a href="/demandes" class="inline-flex items-center gap-1 font-label-md text-label-md font-semibold text-primary hover:text-secondary transition-colors">
+        <span>Voir toutes les demandes ({{ demandes_recentes_total }})</span>
+        <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+      </a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="bg-surface-container-low text-table-header font-table-header text-on-surface-variant uppercase tracking-wider">
+            <th class="py-3 px-4">Employé</th>
+            <th class="py-3 px-4">Type de demande</th>
+            <th class="py-3 px-4">Agence / Dép.</th>
+            <th class="py-3 px-4">Date soumission</th>
+            <th class="py-3 px-4">Statut</th>
+            <th class="py-3 px-4 text-right">Actions rapides</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in demandes_recentes %}
+          <tr class="hover:bg-surface-container-low/50 transition-colors border-t border-surface-container-high">
+            <td class="py-3 px-4">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full {{ d.couleur_avatar }} font-semibold flex items-center justify-center text-[13px] flex-shrink-0">
+                  {{ d.initiales }}
+                </div>
+                <div class="flex flex-col">
+                  <span class="font-label-md text-label-md font-semibold text-on-surface">{{ d.nom_complet }}</span>
+                  <span class="font-caption text-caption text-on-surface-variant">{{ d.matricule }} • {{ d.poste }}</span>
+                </div>
+              </div>
+            </td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm font-medium {{ d.type_couleur }}">
+                <span class="material-symbols-outlined text-[14px]">{{ d.type_icone }}</span>
+                {{ d.type_libelle }}
+              </span>
+            </td>
+            <td class="py-3 px-4">
+              <div class="flex flex-col">
+                <span class="font-body-sm text-body-sm text-on-surface font-medium">{{ d.agence_nom }}</span>
+                <span class="font-caption text-caption text-on-surface-variant">{{ d.departement_nom }}</span>
+              </div>
+            </td>
+            <td class="py-3 px-4">
+              <span class="font-body-sm text-body-sm text-on-surface">{{ d.date_demande.strftime("%d/%m/%Y") if d.date_demande else "—" }}</span>
+            </td>
+            <td class="py-3 px-4">
+              {# [CORRECTIF B8] les statuts réels sont en_attente_n_plus_1 / en_attente_rh (« en_attente » n'est plus créé) #}
+              {% if d.statut in ("en_attente", "en_attente_n_plus_1", "en_attente_rh") %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm font-medium bg-amber-50 text-amber-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                {{ "Attente N+1" if d.statut == "en_attente_n_plus_1" else ("Attente RH" if d.statut == "en_attente_rh" else "En attente") }}
+              </span>
+              {% elif d.statut == "refusee_n_plus_1" %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm font-medium bg-rose-50 text-rose-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                Refusée (N+1)
+              </span>
+              {% elif d.statut == "validee" %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm font-medium bg-emerald-50 text-emerald-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Validée
+              </span>
+              {% elif d.statut == "refusee" %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm font-medium bg-rose-50 text-rose-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                Refusée
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm font-medium bg-surface-container-high text-on-surface-variant">
+                {{ d.statut }}
+              </span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-right">
+              {# [CORRECTIF B8] Boutons affichés pour les demandes réellement en attente, et seulement aux rôles RH
+                 (ils passent par la même logique que le formulaire RH : solde, départ réservé au Chef RH...) #}
+              {% if d.statut in ("en_attente", "en_attente_n_plus_1", "en_attente_rh") and request.session.get('role') in ("Chef RH", "Assistant RH") %}
+              <div class="inline-flex items-center gap-2 justify-end">
+                <form method="post" action="/demandes/{{ d.id }}/statut" class="inline">
+                  {{ csrf_input(request) }}
+                  <input type="hidden" name="nouveau_statut" value="validee">
+                  <button type="submit" class="h-8 px-3 rounded-lg bg-emerald-700 text-white font-label-sm text-label-sm font-medium hover:bg-emerald-800 transition-colors flex items-center gap-1 shadow-sm">
+                    <span class="material-symbols-outlined text-[16px]">check</span>
+                    <span>Valider</span>
+                  </button>
+                </form>
+                <form method="post" action="/demandes/{{ d.id }}/statut" class="inline">
+                  {{ csrf_input(request) }}
+                  <input type="hidden" name="nouveau_statut" value="refusee">
+                  <button type="submit" class="h-8 px-2.5 rounded-lg bg-surface-container-lowest text-rose-700 font-label-sm text-label-sm font-medium hover:bg-rose-50 transition-colors flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+                    <span>Refuser</span>
+                  </button>
+                </form>
+              </div>
+              {% else %}
+              <span class="font-caption text-caption text-on-surface-variant">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not demandes_recentes %}
+          <tr>
+            <td colspan="6" class="text-center py-8 text-on-surface-variant font-body-sm text-body-sm">
+              Aucune demande pour le moment.
+            </td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    {% if demandes_recentes %}
+    <div class="p-4 bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-on-surface-variant font-body-sm text-body-sm">
+      <span>Affichage des {{ demandes_recentes|length }} demandes les plus récentes sur un total de <strong>{{ demandes_recentes_total }} requêtes en suspens</strong></span>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

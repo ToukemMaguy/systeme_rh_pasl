@@ -1,0 +1,541 @@
+{% extends "_layout.html" %}
+{% block content %}
+<style>
+  .tab-list a.tab-btn { text-decoration: none; color: inherit; }
+
+  /* ---- Onglet Documents ---- */
+  .doc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+  }
+  .doc-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    transition: box-shadow 0.15s;
+    display: flex;
+    flex-direction: column;
+  }
+  .doc-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  .doc-preview {
+    height: 130px;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+  .doc-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .doc-preview i {
+    font-size: 42px;
+    color: #cbd5e0;
+  }
+  .doc-preview.manquant {
+    background: #fafafa;
+    border-bottom: 1px dashed var(--border);
+  }
+  .doc-body {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+  }
+  .doc-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--navy);
+  }
+  .doc-status {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .doc-status.ok { color: #276749; font-weight: 500; }
+  .doc-status.manquant { color: #975a16; font-weight: 500; }
+  .doc-actions {
+    padding: 8px 14px 12px;
+    margin-top: auto;
+  }
+  .doc-actions a, .doc-actions span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .doc-actions a { color: var(--blue-accent); }
+  .doc-actions a:hover { text-decoration: underline; }
+  .doc-actions span.disabled { color: #cbd5e0; cursor: not-allowed; }
+  
+  /* ---- Menu déroulant PDF ---- */
+  .dropdown-pdf-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    min-width: 220px;
+    z-index: 50;
+    overflow: hidden;
+  }
+  .dropdown-pdf-menu.show { display: block; }
+  .dropdown-pdf-menu a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    transition: background 0.12s;
+  }
+  .dropdown-pdf-menu a:hover { background: #f7fafc; }
+  .dropdown-pdf-menu a i { color: var(--blue-accent); width: 16px; }
+</style>
+
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;font-size:13px;">
+  <a href="/employes" style="color:var(--blue-accent);text-decoration:none;font-weight:500;">
+    <i class="fas fa-chevron-left" style="margin-right:5px;font-size:11px;"></i>Employés
+  </a>
+  <span class="text-muted">/</span>
+  <span class="text-muted">Fiche employé</span>
+</div>
+
+{% if request.query_params.get('erreur') %}
+<div style="padding:10px 14px;border-radius:8px;background:#ffdad6;color:#93000a;font-size:13px;margin-bottom:14px;">{{ request.query_params.get('erreur') }}</div>
+{% endif %}
+{% if request.query_params.get('ok') %}
+<div style="padding:10px 14px;border-radius:8px;background:#F0FDF4;color:#166534;font-size:13px;margin-bottom:14px;">{{ request.query_params.get('ok') }}</div>
+{% endif %}
+<div class="card" style="padding:0;overflow:hidden;margin-bottom:20px;">
+  <div style="height:90px;background:linear-gradient(135deg, #1a365d 0%, #2c5282 60%, #3182ce 100%);"></div>
+  <div style="padding:0 28px 24px;">
+    <div style="display:flex;align-items:flex-end;gap:20px;margin-top:-44px;">
+      <div style="width:88px;height:88px;border-radius:50%;background:#ebf4ff;border:4px solid #fff;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:var(--navy);flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,0.15);overflow:hidden;">
+        {% if employe.photo_path %}
+        <img src="/{{ employe.photo_path }}" alt="Photo de {{ employe.prenom }} {{ employe.nom }}" style="width:100%;height:100%;object-fit:cover;">
+        {% else %}
+        {{ (employe.prenom[0] if employe.prenom else '') ~ (employe.nom[0] if employe.nom else '') }}
+        {% endif %}
+      </div>
+      <div style="flex:1;"></div>
+    </div>
+
+    <div style="padding:0 28px 24px;margin-top:14px;">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h2 style="font-size:20px;font-weight:800;color:var(--navy);margin:0;">{{ employe.nom }} {{ employe.prenom }}</h2>
+          <div style="font-size:14px;color:var(--muted);margin-top:3px;">
+            <i class="fas fa-briefcase" style="margin-right:6px;"></i>
+            {{ employe.poste.intitule if employe.poste else "—" }} &middot; {{ employe.departement.nom if employe.departement else "—" }}
+          </div>
+        </div>
+               <div class="d-flex gap-2" style="position:relative;">
+          <a href="/employes/{{ employe.id }}/modifier" class="btn btn-primary"><i class="fas fa-pen"></i> Modifier</a>
+          {# [ÉTAPE 3] Licenciement : visible uniquement par la RH (confidentialité) #}
+          {% if request.session.get('role') in ('Chef RH', 'Assistant RH') %}
+            {% if dossier_licenciement %}
+            <a href="/licenciements/{{ dossier_licenciement.id }}" class="btn btn-outline" style="color:#9b2c2c;border-color:#fed7d7;"><i class="fas fa-gavel"></i> Procédure de licenciement en cours</a>
+            {% elif employe.statut == 'actif' %}
+            <a href="/employes/{{ employe.id }}/licenciement/nouveau" class="btn btn-outline"><i class="fas fa-gavel"></i> Engager une procédure de licenciement</a>
+            {% endif %}
+          {% endif %}
+          <div class="dropdown-pdf" style="position:relative;">
+            <button type="button" class="btn btn-outline" onclick="document.getElementById('menu-pdf').classList.toggle('show');">
+              <i class="fas fa-file-pdf"></i> Exporter en PDF <i class="fas fa-caret-down" style="margin-left:4px;"></i>
+            </button>
+            <div id="menu-pdf" class="dropdown-pdf-menu">
+              <a href="/employes/{{ employe.id }}/pdf/fiche" target="_blank">
+                <i class="fas fa-id-card"></i> Fiche employé
+              </a>
+              {# [CORRECTIF B16] le certificat de travail n'a de sens qu'après le départ #}
+              {% if employe.statut != "actif" %}
+              <a href="/employes/{{ employe.id }}/pdf/certificat" target="_blank">
+                <i class="fas fa-award"></i> Certificat de travail
+              </a>
+              {% endif %}
+              <a href="/employes/{{ employe.id }}/pdf/attestation" target="_blank">
+                <i class="fas fa-file-signature"></i> Attestation de travail
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="form-grid" style="margin-bottom:20px;">
+  <div class="card" style="padding:24px;">
+    <div style="font-weight:700;font-size:14px;color:var(--navy);margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+      <i class="fas fa-id-card" style="color:var(--blue-accent);margin-right:8px;"></i>Informations personnelles
+    </div>
+    {% set infos_perso = [
+      ("Matricule", employe.matricule or "—", "fa-hashtag"),
+      ("Nom complet", employe.nom ~ ", " ~ employe.prenom, "fa-user"),
+      ("Genre", "Homme" if employe.genre == "H" else "Femme", "fa-venus-mars"),
+      ("Date de naissance", (employe.date_naissance.strftime("%d/%m/%Y") ~ " (" ~ age|string ~ " ans)") if employe.date_naissance else "Non renseignée", "fa-cake-candles"),
+      ("Téléphone professionnel", employe.telephone_pro or "—", "fa-phone"),
+      ("Téléphone personnel", employe.telephone_perso or "—", "fa-mobile-screen"),
+      ("Email personnel", employe.email_perso or "—", "fa-envelope"),
+    ] %}
+    {% for label, valeur, icone in infos_perso %}
+    <div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #f7fafc;">
+      <i class="fas {{ icone }}" style="color:var(--muted);width:16px;margin-top:2px;font-size:13px;"></i>
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">{{ label }}</div>
+        <div style="font-size:14px;font-weight:500;color:var(--text);margin-top:2px;">{{ valeur }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card" style="padding:24px;">
+    <div style="font-weight:700;font-size:14px;color:var(--navy);margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+      <i class="fas fa-briefcase" style="color:var(--blue-accent);margin-right:8px;"></i>Informations professionnelles
+    </div>
+    <div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #f7fafc;">
+      <i class="fas fa-building" style="color:var(--muted);width:16px;margin-top:2px;font-size:13px;"></i>
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Département</div>
+        <div style="font-size:14px;font-weight:500;color:var(--text);margin-top:2px;">{{ employe.departement.nom if employe.departement else "—" }}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #f7fafc;">
+      <i class="fas fa-map-marker-alt" style="color:var(--muted);width:16px;margin-top:2px;font-size:13px;"></i>
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Agence</div>
+        <div style="font-size:14px;font-weight:500;color:var(--text);margin-top:2px;">{{ employe.agence.nom if employe.agence else "Aucune (Direction Générale)" }}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #f7fafc;">
+      <i class="fas fa-medal" style="color:var(--muted);width:16px;margin-top:2px;font-size:13px;"></i>
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Poste / Grade</div>
+        <div style="font-size:14px;font-weight:500;color:var(--text);margin-top:2px;">{{ employe.poste.intitule if employe.poste else "—" }} &middot; {{ employe.grade.libelle if employe.grade else "—" }}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #f7fafc;">
+      <i class="fas fa-calendar" style="color:var(--muted);width:16px;margin-top:2px;font-size:13px;"></i>
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Date d'embauche</div>
+        <div style="font-size:14px;font-weight:500;color:var(--text);margin-top:2px;">{{ employe.date_embauche.strftime("%d/%m/%Y") if employe.date_embauche else "—" }}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #f7fafc;">
+      <i class="fas fa-hourglass-half" style="color:var(--muted);width:16px;margin-top:2px;font-size:13px;"></i>
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Ancienneté</div>
+        <div style="font-size:14px;font-weight:500;color:var(--text);margin-top:2px;">{{ anciennete }}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;padding:9px 0;">
+      <i class="fas fa-circle-check" style="color:var(--muted);width:16px;margin-top:2px;font-size:13px;"></i>
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Statut</div>
+        <div style="margin-top:2px;">
+          {% if employe.statut == "actif" %}<span class="badge badge-success">Actif</span>
+          {% else %}<span class="badge badge-secondary">Inactif</span>{% endif %}
+          </div>
+      </div>
+    </div>
+            <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]">
+          <span class="text-on-surface-variant">Supérieur hiérarchique (N+1)</span>
+          <span class="font-medium text-on-surface">
+            {% if employe.n_plus_1 %}
+              {{ employe.n_plus_1.nom }} {{ employe.n_plus_1.prenom }}
+            {% else %}
+              <span class="text-on-surface-variant">Non défini</span>
+            {% endif %}
+          </span>
+      </div>
+  </div>
+</div>
+
+{% if employe.cni_path or employe.plan_localisation_path %}
+<div class="card" style="padding:24px;margin-bottom:20px;">
+  <div style="font-weight:700;font-size:14px;color:var(--navy);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+    <i class="fas fa-paperclip" style="color:var(--blue-accent);margin-right:8px;"></i>Pièces jointes
+  </div>
+  <div class="d-flex gap-3 flex-wrap">
+    {% if employe.cni_path %}
+    <a href="/{{ employe.cni_path }}" target="_blank" class="btn btn-outline">
+      <i class="fas fa-id-card"></i> Voir la CNI
+    </a>
+    {% endif %}
+    {% if employe.plan_localisation_path %}
+    <a href="/{{ employe.plan_localisation_path }}" target="_blank" class="btn btn-outline">
+      <i class="fas fa-map-location-dot"></i> Voir le plan de localisation
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card" style="overflow:hidden;">
+  <div style="padding:0 24px;">
+    <div class="tab-list">
+      <a href="/employes/{{ employe.id }}" class="tab-btn {{ 'active' if onglet == 'historique' else '' }}"><i class="fas fa-clock-rotate-left" style="margin-right:7px;"></i>Historique</a>  
+      <a href="/employes/{{ employe.id }}?onglet=conges" class="tab-btn {{ 'active' if onglet == 'conges' else '' }}"><i class="fas fa-calendar-alt" style="margin-right:7px;"></i>Congés</a>
+      <a href="/employes/{{ employe.id }}?onglet=documents" class="tab-btn {{ 'active' if onglet == 'documents' else '' }}"><i class="fas fa-folder-open" style="margin-right:7px;"></i>Documents</a> 
+      <a href="/employes/{{ employe.id }}?onglet=disciplinaire" class="tab-btn {{ 'active' if onglet == 'disciplinaire' else '' }}"><i class="fas fa-gavel" style="margin-right:7px;"></i>Suivi disciplinaire</a>
+    </div>
+  </div>
+
+  <div style="padding:20px 24px;">
+        {% if onglet == "disciplinaire" %}
+    <!-- Onglet Suivi disciplinaire -->
+    <div class="d-flex justify-content-between align-items-center" style="margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-weight:700;font-size:14px;color:var(--navy);">
+          <i class="fas fa-gavel" style="color:var(--blue-accent);margin-right:8px;"></i>Suivi disciplinaire
+        </div>
+        <p class="text-muted" style="font-size:13px;margin:4px 0 0;">
+          Historique des sanctions et mesures disciplinaires enregistrées pour cet employé.
+        </p>
+      </div>
+      <a href="/employes/{{ employe.id }}/sanctions/nouvelle" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Enregistrer une sanction
+      </a>
+    </div>
+
+    {% if sanctions %}
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Motif</th>
+            <th>Durée</th>
+            <th>Enregistré par</th>
+            <th style="text-align:center;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sanctions %}
+          <tr>
+            <td style="font-weight:600;white-space:nowrap;">
+              {{ s.date_sanction.strftime("%d/%m/%Y") if s.date_sanction else "—" }}
+            </td>
+            <td>
+              {% set type_class = 'danger' if 'Licenciement' in s.type_sanction else ('warning' if 'Mise' in s.type_sanction else ('info' if 'Blâme' in s.type_sanction else 'secondary')) %}
+              <span class="badge badge-{{ type_class }}">{{ s.type_sanction }}</span>
+            </td>
+            <td style="font-size:13px;color:var(--text);">
+              {{ s.motif or "—" }}
+              {% if s.commentaire %}
+              <div style="font-size:12px;color:var(--muted);margin-top:2px;font-style:italic;">
+                <i class="fas fa-comment-dots" style="margin-right:4px;"></i>{{ s.commentaire }}
+              </div>
+              {% endif %}
+            </td>
+            <td class="text-muted" style="font-size:13px;">{{ s.duree or "—" }}</td>
+            <td class="text-muted" style="font-size:13px;">{{ s.enregistre_par or "—" }}</td>
+            <td style="text-align:center;">
+              <form method="post" action="/employes/{{ employe.id }}/sanctions/{{ s.id }}/supprimer" style="display:inline;"
+                    onsubmit="return confirm('Supprimer cette sanction ? Cette action est irréversible.');">
+                {{ csrf_input(request) }}
+                <button type="submit" class="btn btn-sm btn-danger" title="Supprimer"><i class="fas fa-trash"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:30px 20px;text-align:center;background:#f7fafc;border-radius:8px;border:1px dashed var(--border);">
+      <i class="fas fa-circle-check" style="font-size:32px;color:#38a169;margin-bottom:10px;"></i>
+      <p style="margin:0;font-weight:600;color:var(--navy);">Aucune sanction enregistrée</p>
+      <p style="margin:4px 0 0;font-size:13px;color:var(--muted);">Cet employé n'a fait l'objet d'aucune mesure disciplinaire.</p>
+    </div>
+    {% endif %}
+    {% endif %}
+    {% if onglet == "documents" %}
+    <!-- Onglet Documents : grille des documents disponibles -->
+    <div style="font-weight:700;font-size:14px;color:var(--navy);margin-bottom:6px;">
+      <i class="fas fa-folder-open" style="color:var(--blue-accent);margin-right:8px;"></i>Documents de l'employé
+    </div>
+    <p class="text-muted" style="font-size:13px;margin:0 0 16px;">
+      Documents numérisés et pièces jointes enregistrés pour cet employé.
+    </p>
+
+    <div class="doc-grid">
+
+      <!-- Photo de profil -->
+      <div class="doc-card">
+        <div class="doc-preview {% if not employe.photo_path %}manquant{% endif %}">
+          {% if employe.photo_path %}
+            <img src="/{{ employe.photo_path }}" alt="Photo">
+          {% else %}
+            <i class="fas fa-user-circle"></i>
+          {% endif %}
+        </div>
+        <div class="doc-body">
+          <div class="doc-title">Photo de profil</div>
+          {% if employe.photo_path %}
+            <div class="doc-status ok"><i class="fas fa-check-circle" style="margin-right:4px;"></i>Disponible</div>
+          {% else %}
+            <div class="doc-status manquant"><i class="fas fa-exclamation-circle" style="margin-right:4px;"></i>Non fournie</div>
+          {% endif %}
+        </div>
+        <div class="doc-actions">
+          {% if employe.photo_path %}
+            <a href="/{{ employe.photo_path }}" target="_blank"><i class="fas fa-eye"></i> Voir</a>
+          {% else %}
+            <span class="disabled"><i class="fas fa-eye-slash"></i> Aucun fichier</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- CNI -->
+      <div class="doc-card">
+        <div class="doc-preview {% if not employe.cni_path %}manquant{% endif %}">
+          {% if employe.cni_path %}
+            <img src="/{{ employe.cni_path }}" alt="CNI">
+          {% else %}
+            <i class="fas fa-id-card"></i>
+          {% endif %}
+        </div>
+        <div class="doc-body">
+          <div class="doc-title">Carte Nationale d'Identité</div>
+          {% if employe.cni_path %}
+            <div class="doc-status ok"><i class="fas fa-check-circle" style="margin-right:4px;"></i>Disponible</div>
+          {% else %}
+            <div class="doc-status manquant"><i class="fas fa-exclamation-circle" style="margin-right:4px;"></i>Non fournie</div>
+          {% endif %}
+        </div>
+        <div class="doc-actions">
+          {% if employe.cni_path %}
+            <a href="/{{ employe.cni_path }}" target="_blank"><i class="fas fa-eye"></i> Voir</a>
+          {% else %}
+            <span class="disabled"><i class="fas fa-eye-slash"></i> Aucun fichier</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Plan de localisation -->
+      <div class="doc-card">
+        <div class="doc-preview {% if not employe.plan_localisation_path %}manquant{% endif %}">
+          {% if employe.plan_localisation_path %}
+            <img src="/{{ employe.plan_localisation_path }}" alt="Plan de localisation">
+          {% else %}
+            <i class="fas fa-map-location-dot"></i>
+          {% endif %}
+        </div>
+        <div class="doc-body">
+          <div class="doc-title">Plan de localisation</div>
+          {% if employe.plan_localisation_path %}
+            <div class="doc-status ok"><i class="fas fa-check-circle" style="margin-right:4px;"></i>Disponible</div>
+          {% else %}
+            <div class="doc-status manquant"><i class="fas fa-exclamation-circle" style="margin-right:4px;"></i>Non fourni</div>
+          {% endif %}
+        </div>
+        <div class="doc-actions">
+          {% if employe.plan_localisation_path %}
+            <a href="/{{ employe.plan_localisation_path }}" target="_blank"><i class="fas fa-eye"></i> Voir</a>
+          {% else %}
+            <span class="disabled"><i class="fas fa-eye-slash"></i> Aucun fichier</span>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+    {% endif %}
+
+    {% if onglet == "conges" %}
+    <!-- Onglet Congés : soldes par année + historique des congés pris -->
+    <div style="font-weight:700;font-size:14px;color:var(--navy);margin-bottom:6px;">
+      <i class="fas fa-calendar-days" style="color:var(--blue-accent);margin-right:8px;"></i>Soldes de congés par année
+    </div>
+    {% for s in soldes %}
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f7fafc;flex-wrap:wrap;">
+      <span style="font-weight:700;font-size:14px;color:var(--navy);min-width:60px;">{{ s.annee }}</span>
+      <span style="font-size:13px;color:var(--muted);">Alloués : <strong style="color:var(--text);">{{ s.jours_alloues | fmt_nombre }}j</strong></span>
+      <span style="font-size:13px;color:var(--muted);">Pris : <strong style="color:#b7791f;">{{ s.jours_pris | fmt_nombre }}j</strong></span>
+<span style="font-size:13px;color:var(--muted);"> Restants : <strong style="color:{{'#e53e3e' if (s.jours_restants is none or s.jours_restants == 0)
+    else ('#b7791f' if s.jours_restants <= 5
+    else '#276749')
+  }};">
+    {{ s.jours_restants | fmt_nombre if s.jours_restants is not none else '—' }}j
+  </strong>
+</span>    </div>
+    {% else %}
+    <p class="text-muted" style="padding:8px 0 4px;">Aucun solde de congé enregistré pour cet employé.</p>
+    {% endfor %}
+
+    <div style="font-weight:700;font-size:14px;color:var(--navy);margin:22px 0 6px;">
+      <i class="fas fa-umbrella-beach" style="color:var(--blue-accent);margin-right:8px;"></i>Congés pris (historique)
+    </div>
+    {% for c in conges_pris %}
+    <div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #f7fafc;">
+      <i class="fas fa-calendar-check" style="color:var(--muted);width:16px;margin-top:2px;font-size:13px;"></i>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:500;color:var(--text);">
+          Du {{ c.date_debut.strftime("%d/%m/%Y") if c.date_debut else "—" }} au {{ c.date_fin.strftime("%d/%m/%Y") if c.date_fin else "—" }}
+          <span style="float:right;font-weight:700;color:var(--navy);">{{ duree_absence(c) }}j</span>
+        </div>
+        {% if c.motif %}<div style="font-size:12px;color:var(--muted);margin-top:2px;">{{ c.motif }}</div>{% endif %}
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted" style="padding:8px 0;">Aucun congé daté enregistré pour cet employé.</p>
+    {% endfor %}
+
+       {% elif onglet == "historique" %}
+    <!-- Onglet Historique (par défaut) -->
+    {% for h in historique %}
+    <div style="display:flex;gap:16px;{{ 'padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid #f7fafc;' if not loop.last else '' }}">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:14px;flex-shrink:0;">
+        <i class="fas fa-history"></i>
+      </div>
+      <div style="flex:1;">
+        <div class="d-flex justify-content-between align-items-center">
+          <div style="font-weight:700;font-size:14px;text-transform:capitalize;">{{ h.type_mouvement.replace('_', ' ') if h.type_mouvement else "Changement" }}</div>
+          <span style="font-size:12px;color:var(--muted);">
+            {{ h.date_debut.strftime("%d/%m/%Y") if h.date_debut else "—" }}{% if h.date_fin %} → {{ h.date_fin.strftime("%d/%m/%Y") }}{% endif %}
+          </span>
+        </div>
+        <div style="font-size:13px;color:var(--muted);margin-top:3px;">
+          {{ h.poste.intitule if h.poste else "—" }}
+          {% if h.departement %} &middot; {{ h.departement.nom }}{% endif %}
+          {% if h.agence %} &middot; {{ h.agence.nom }}{% endif %}
+          {% if h.grade %} &middot; {{ h.grade.libelle }}{% endif %}
+        </div>
+        {% if h.motif %}
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;"><i class="fas fa-comment-dots" style="margin-right:4px;"></i>{{ h.motif }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% if not historique %}
+    <p class="text-muted" style="padding:10px 0;">Aucun historique enregistré pour cet employé.</p>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+<script>
+  document.addEventListener('click', function(e) {
+    const menu = document.getElementById('menu-pdf');
+    const btn = menu && menu.previousElementSibling;
+    if (!menu) return;
+    if (!menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+      menu.classList.remove('show');
+    }
+  });
+</script>
+
+{% endblock %}

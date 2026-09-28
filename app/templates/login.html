@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Connexion — Système RH</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<style>
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  ::-webkit-scrollbar { display: none; }
+</style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: {
+      "primary": "#003c59", "primary-container": "#06547a", "secondary": "#1a6682",
+      "surface": "#f9f9ff", "surface-container-lowest": "#ffffff", "surface-container": "#e7eefe",
+      "surface-container-low": "#f0f3ff", "surface-container-high": "#e2e8f8",
+      "on-surface": "#151c27", "on-surface-variant": "#41484e", "outline": "#71787f",
+      "error": "#ba1a1a", "error-container": "#ffdad6"
+    }, fontFamily: { sans: ["Inter", "sans-serif"] } } } };
+  </script>
+</head>
+<body class="bg-surface font-sans text-[14px] text-on-surface antialiased min-h-screen flex items-center justify-center p-4">
+  <main class="w-full max-w-md">
+    <div class="relative w-full bg-surface-container-lowest rounded-xl shadow-xl overflow-hidden p-8 sm:p-10">
+      <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary-container via-primary to-secondary"></div>
+
+      <div class="flex flex-col items-center text-center mb-6">
+        <div class="mb-4 w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center">
+          <span class="material-symbols-outlined text-primary text-[30px]">account_balance</span>
+        </div>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-primary text-[11px] uppercase tracking-wider mb-2">
+          <span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+          <span>Système Institutionnel Sécurisé</span>
+        </div>
+        <h1 class="text-[22px] font-semibold text-on-surface">Espace de Connexion RH</h1>
+        <p class="text-[13px] text-on-surface-variant mt-1 max-w-xs">Accédez à votre portail de gestion des ressources humaines et opérations administratives</p>
+      </div>
+
+      {% if erreur %}
+      <div class="mb-4 px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px] flex items-center gap-2">
+        <span class="material-symbols-outlined text-[16px]">error</span>
+        <span>{{ erreur }}</span>
+      </div>
+      {% endif %}
+
+      <form method="post" action="/login" class="space-y-4">
+        {{ csrf_input(request) }}
+        <div>
+          <label class="block text-[13px] font-medium text-on-surface mb-1" for="email">Adresse email professionnelle</label>
+          <div class="relative flex items-center">
+            <span class="material-symbols-outlined absolute left-3 text-outline pointer-events-none text-[18px]">mail</span>
+            <input class="w-full h-11 pl-10 pr-4 bg-surface-container-lowest text-on-surface text-[14px] rounded-lg shadow-sm border border-surface-container-high placeholder:text-outline focus:outline-none focus:bg-surface-container-low transition-colors" id="email" name="email" placeholder="nom@panafricansl.cm" required type="email">
+          </div>
+        </div>
+        <div>
+          <label class="block text-[13px] font-medium text-on-surface mb-1" for="password">Mot de passe</label>
+          <div class="relative flex items-center">
+            <span class="material-symbols-outlined absolute left-3 text-outline pointer-events-none text-[18px]">lock</span>
+            <input class="w-full h-11 pl-10 pr-4 bg-surface-container-lowest text-on-surface text-[14px] rounded-lg shadow-sm border border-surface-container-high placeholder:text-outline focus:outline-none focus:bg-surface-container-low transition-colors" id="password" name="mot_de_passe" placeholder="Saisissez votre mot de passe" required type="password">
+          </div>
+        </div>
+        <div class="pt-2">
+          <button class="relative w-full h-11 flex items-center justify-center gap-2 bg-gradient-to-r from-primary-container to-secondary text-white text-[14px] font-semibold rounded-lg shadow-md hover:shadow-lg transition-all" type="submit">
+            <span class="material-symbols-outlined text-[18px]">login</span>
+            <span>Se connecter au portail</span>
+          </button>
+        </div>
+      </form>
+
+      <div class="mt-6 pt-4 -mx-8 -mb-8 sm:-mx-10 sm:-mb-10 p-4 sm:px-10 bg-surface-container-low flex flex-col items-center text-center gap-2">
+        <div class="flex items-center gap-3 text-[11px] text-outline">
+          <span class="flex items-center gap-1">
+            <span class="material-symbols-outlined text-[13px] text-secondary" style="font-variation-settings: 'FILL' 1;">lock</span>
+            Connexion sécurisée
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center justify-center text-on-surface-variant px-2 mt-4 text-[11px]">
+      <span>Système RH — Panafrican SL Cameroun</span>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,110 @@
+{% extends "_layout.html" %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Administration</div>
+    <div class="page-subtitle">Départements, agences, postes et grades utilisés dans les fiches employé</div>
+  </div>
+  <a href="/admin/utilisateurs" class="btn btn-outline">
+    <i class="fas fa-users-gear"></i> Comptes utilisateurs
+  </a>
+</div>
+
+{% if request.query_params.get('erreur') %}
+<div class="alert alert-danger">
+  <span>{{ request.query_params.get('erreur') }}</span>
+  <button class="alert-close" onclick="this.parentElement.style.display='none'">&times;</button>
+</div>
+{% endif %}
+
+<div class="card" style="padding:0 20px;margin-bottom:20px;">
+  <div class="tab-list">
+    {% for cle, info in referentiels.items() %}
+    <a href="/admin?section={{ cle }}" class="tab-btn {{ 'active' if section == cle else '' }}">
+      <i class="fas {{ info.icone }}"></i> {{ info.label }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card" style="padding:20px;margin-bottom:20px;">
+  <div style="font-weight:700;font-size:15px;color:var(--navy);margin-bottom:14px;">
+    <i class="fas fa-plus-circle" style="color:var(--blue-accent);margin-right:8px;"></i>
+    {% if section == "departements" %}Ajouter un département
+    {% elif section == "agences" %}Ajouter une agence
+    {% elif section == "postes" %}Ajouter un poste
+    {% else %}Ajouter un grade{% endif %}
+  </div>
+  <form method="post" action="/admin/{{ section }}/nouveau" class="form-grid" style="align-items:end;">
+    {{ csrf_input(request) }}
+    <div>
+      <label class="form-label">
+        {% if section == "departements" %}Nom du département
+        {% elif section == "agences" %}Nom de l'agence
+        {% elif section == "postes" %}Intitulé du poste
+        {% else %}Libellé du grade{% endif %}
+      </label>
+      <input type="text" name="valeur" class="form-control" required>
+    </div>
+    {% if section == "agences" %}
+    <div>
+      <label class="form-label">Ville (optionnel)</label>
+      <input type="text" name="ville" class="form-control">
+    </div>
+    <div>
+      <label class="form-label">Région (optionnel)</label>
+      <input type="text" name="region" class="form-control">
+    </div>
+    {% elif section == "grades" %}
+    <div>
+      <label class="form-label">Niveau hiérarchique (optionnel)</label>
+      <input type="number" name="niveau_hierarchique" class="form-control" min="1" placeholder="1 = le plus élevé">
+    </div>
+    {% endif %}
+    <div>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter</button>
+    </div>
+  </form>
+</div>
+
+<div class="card table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>{{ referentiels[section].label[:-1] }}</th>
+        {% if section == "agences" %}<th>Ville</th><th>Région</th>{% endif %}
+        {% if section == "grades" %}<th>Niveau</th>{% endif %}
+        <th>Employés rattachés</th>
+        <th style="text-align:center;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in elements %}
+      <tr>
+        <td style="font-weight:600;">{{ e|attr(referentiels[section].champ) }}</td>
+        {% if section == "agences" %}
+        <td class="text-muted">{{ e.ville or "—" }}</td>
+        <td class="text-muted">{{ e.region or "—" }}</td>
+        {% endif %}
+        {% if section == "grades" %}
+        <td class="text-muted">{{ e.niveau_hierarchique if e.niveau_hierarchique is not none else "—" }}</td>
+        {% endif %}
+        <td>
+          <span class="badge {{ 'badge-secondary' if compteurs.get(e.id, 0) == 0 else 'badge-info' }}">{{ compteurs.get(e.id, 0) }}</span>
+        </td>
+        <td style="text-align:center;">
+          <form method="post" action="/admin/{{ section }}/{{ e.id }}/supprimer" class="d-inline"
+                onsubmit="return confirm('Supprimer « {{ e|attr(referentiels[section].champ) }} » ? Cette action est irréversible.');">
+            {{ csrf_input(request) }}
+            <button type="submit" class="btn btn-sm btn-danger" title="Supprimer"><i class="fas fa-trash"></i></button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not elements %}
+  <p class="text-muted" style="padding:20px;">Aucun élément pour l'instant.</p>
+  {% endif %}
+</div>
+{% endblock %}

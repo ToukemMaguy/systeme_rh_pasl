@@ -1,0 +1,147 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Mes validations{% endblock %}
+{% block content %}
+<div class="flex flex-col gap-4">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-[22px] font-semibold text-on-surface">Mes validations</h1>
+      <p class="text-[13px] text-on-surface-variant mt-0.5">
+        Demandes de vos subordonnés directs ({{ mes_n_moins_1|length }} N-1)
+      </p>
+    </div>
+  </div>
+
+  {% if request.query_params.get('ok') %}
+  <div class="px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px]">{{ request.query_params.get('ok') }}</div>
+  {% endif %}
+  {% if request.query_params.get('erreur') %}
+  <div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ request.query_params.get('erreur') }}</div>
+  {% endif %}
+
+  <!-- Demandes à valider -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4 flex items-center justify-between">
+      <span class="text-[15px] font-semibold text-on-surface">
+        Demandes en attente de votre avis
+        {% if demandes_a_valider %}
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-amber-50 text-amber-700 font-semibold ml-1">
+          {{ demandes_a_valider|length }}
+        </span>
+        {% endif %}
+      </span>
+    </div>
+    {% if demandes_a_valider %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Employé</th>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Période sollicitée</th>
+            <th class="py-3 px-4">Suppléant</th>
+            <th class="py-3 px-4">Motif</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for d in demandes_a_valider %}
+          <tr class="border-t border-surface-container-high">
+            <td class="py-3 px-4 font-medium">
+              {{ d.employe_concerne.nom }} {{ d.employe_concerne.prenom }}
+              <span class="text-[11px] text-on-surface-variant block">{{ d.employe_concerne.matricule or "—" }}</span>
+            </td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-secondary-fixed text-on-secondary-fixed font-medium">
+                {{ types_demande_map.get(d.type_demande_id, "—") }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-on-surface-variant">
+              {% if d.periode_sollicitee_debut and d.periode_sollicitee_fin %}
+                Du {{ d.periode_sollicitee_debut.strftime("%d/%m/%Y") }}<br>
+                au {{ d.periode_sollicitee_fin.strftime("%d/%m/%Y") }}
+                <span class="text-[11px] block text-outline">({{ duree_demande(types_demande_map.get(d.type_demande_id, ""), d.periode_sollicitee_debut, d.periode_sollicitee_fin) }})</span>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-[12px]">
+              {% if d.suppleant %}
+                {{ d.suppleant.nom }} {{ d.suppleant.prenom }}
+              {% else %}
+                <span class="text-on-surface-variant">—</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-on-surface-variant text-[12px]">{{ d.commentaire or "—" }}</td>
+            <td class="py-3 px-4 text-right">
+              <a href="/demandes/{{ d.id }}/avis" class="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-primary-container text-white text-[12px] font-semibold hover:opacity-95">
+                <span class="material-symbols-outlined text-[16px]">rate_review</span>
+                <span>Traiter</span>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-on-surface-variant text-[13px] p-5">Aucune demande en attente de votre avis.</p>
+    {% endif %}
+  </div>
+
+  <!-- Historique de mes avis -->
+  {% if demandes_traitees %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4">
+      <span class="text-[15px] font-semibold text-on-surface">Historique de mes avis (10 derniers)</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Employé</th>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Mon avis</th>
+            <th class="py-3 px-4">Date</th>
+            <th class="py-3 px-4">Statut actuel</th>
+          </tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for d in demandes_traitees %}
+          <tr class="border-t border-surface-container-high">
+            <td class="py-3 px-4 font-medium">{{ d.employe_concerne.nom }} {{ d.employe_concerne.prenom }}</td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-secondary-fixed text-on-secondary-fixed font-medium">
+                {{ types_demande_map.get(d.type_demande_id, "—") }}
+              </span>
+            </td>
+            <td class="py-3 px-4">
+              {% if d.avis_n_plus_1 == "favorable" %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#c6f6d5] text-[#276749] font-medium">Favorable</span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Défavorable</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ d.date_avis_n_plus_1.strftime("%d/%m/%Y") if d.date_avis_n_plus_1 else "—" }}</td>
+            <td class="py-3 px-4">
+              {% if d.statut == "en_attente_rh" %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fefcbf] text-[#975a16] font-medium">Chez les RH</span>
+              {% elif d.statut == "refusee_n_plus_1" %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Refusée (définitif)</span>
+              {% elif d.statut == "validee" %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#c6f6d5] text-[#276749] font-medium">Validée RH</span>
+              {% elif d.statut == "refusee" %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Refusée RH</span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-surface-container-high text-on-surface-variant font-medium">{{ d.statut }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

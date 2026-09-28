@@ -1,0 +1,3 @@
+# Dépendances utiles uniquement pour lancer les tests (pas pour faire tourner l'application)
+-r requirements.txt
+httpx2

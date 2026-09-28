@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# Environnement Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Données personnelles des employés : ne jamais les publier
+app/static/uploads/
+data/
+
+# Divers
+*.db
+.vscode/
+.idea/

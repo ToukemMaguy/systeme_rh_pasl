@@ -1,0 +1,229 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Demandes RH{% endblock %}
+{% block content %}
+<div class="flex flex-col gap-4">
+
+  {% if request.query_params.get('ok') %}
+  <div class="px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px]">{{ request.query_params.get('ok') }}</div>
+  {% endif %}
+  {% if request.query_params.get('erreur') %}
+  <div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ request.query_params.get('erreur') }}</div>
+  {% endif %}
+
+  <!-- Filtres (masquables) -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5 zone-filtres" id="zone-filtres-demandes">
+    <div class="flex items-center justify-between">
+      <button type="button" onclick="toggleFiltres('zone-filtres-demandes')" class="btn-toggle-filtres inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold hover:bg-surface-container-highest transition-all">
+        <span class="material-symbols-outlined text-[18px]">filter_list</span>
+        <span>Filtres</span>
+        <span class="badge-filtres-actifs inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-primary-container text-white text-[11px] font-bold" style="display:none;"></span>
+      </button>
+      <a href="/demandes/nouvelle" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-primary-container text-white text-[13px] font-semibold hover:opacity-95 transition-all">
+        <span class="material-symbols-outlined text-[18px]">add</span>
+        <span>Nouvelle demande</span>
+      </a>
+    </div>
+
+    <div class="filtres-contenu" style="display:none;margin-top:16px;">
+      <form method="get" action="/demandes">
+        <!-- Ligne 1 : Recherche + Type + Agence -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 mb-3">
+          <div class="lg:col-span-4">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Recherche employé</label>
+            <div class="relative">
+              <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">search</span>
+              <input type="text" name="q" value="{{ q or '' }}"
+                     class="w-full h-[38px] pl-9 pr-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                     placeholder="Nom, prénom ou matricule...">
+            </div>
+          </div>
+
+          <div class="lg:col-span-4">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Type de demande</label>
+            <select name="type" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="">Tous les types</option>
+              {% for t in types_demande %}
+              <option value="{{ t.libelle }}" {% if type_selectionne == t.libelle %}selected{% endif %}>{{ t.libelle }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="lg:col-span-4">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Agence</label>
+            <select name="agence_id" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="">Toutes les agences</option>
+              {% for a in agences %}
+              <option value="{{ a.id }}" {% if agence_id == a.id|string %}selected{% endif %}>{{ a.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Ligne 2 : Département + Sexe + Tranche d'âge -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 mb-3">
+          <div class="lg:col-span-4">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Département</label>
+            <select name="departement_id" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="">Tous les départements</option>
+              {% for d in departements %}
+              <option value="{{ d.id }}" {% if departement_id == d.id|string %}selected{% endif %}>{{ d.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="lg:col-span-3">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Sexe</label>
+            <select name="sexe" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="">Tous</option>
+              <option value="H" {% if sexe == "H" %}selected{% endif %}>Homme</option>
+              <option value="F" {% if sexe == "F" %}selected{% endif %}>Femme</option>
+            </select>
+          </div>
+
+          <div class="lg:col-span-5">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Tranche d'âge</label>
+            <select name="tranche_age" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+              <option value="">Toutes</option>
+              {% for t in ["≤25", "26-35", "36-45", "46-55", "56+"] %}
+              <option value="{{ t }}" {% if tranche_age == t %}selected{% endif %}>{{ t }} ans</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Ligne 3 : Embauché après/avant -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+          <div class="lg:col-span-4">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Embauché après</label>
+            <input type="date" name="embauche_debut" value="{{ embauche_debut or '' }}"
+                   class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+          </div>
+
+          <div class="lg:col-span-4">
+            <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Embauché avant</label>
+            <input type="date" name="embauche_fin" value="{{ embauche_fin or '' }}"
+                   class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+          </div>
+        </div>
+
+        <!-- Boutons -->
+        <div class="flex items-center justify-end gap-3 mt-4 pt-3 border-t border-surface-container-high">
+          <a href="/demandes" class="text-[13px] text-on-surface-variant hover:text-primary underline underline-offset-4">
+            Réinitialiser les filtres
+          </a>
+          <button type="submit" class="inline-flex items-center justify-center gap-2 h-[38px] px-5 rounded-lg bg-primary-container text-white text-[13px] font-semibold shadow-sm hover:opacity-95 transition-all">
+            <span class="material-symbols-outlined text-[18px]">search</span>
+            <span>Filtrer</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Vue Chef RH : par agence -->
+  {% if stats_agences %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4"><span class="text-[15px] font-semibold text-on-surface">Vue par agence — employés demandeurs et types de demandes</span></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr><th class="py-3 px-4">Agence</th><th class="py-3 px-4">Employés ayant demandé</th><th class="py-3 px-4">Types de demandes</th><th class="py-3 px-4 text-center">Total</th></tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for s in stats_agences %}
+          <tr class="border-t border-surface-container-high">
+            <td class="py-3 px-4 font-semibold">{{ s.agence }}</td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ s.demandeurs|join(", ") }}</td>
+            <td class="py-3 px-4">
+              {% for t, n in s.par_type.items() %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-secondary-fixed text-on-secondary-fixed font-medium mr-1">{{ t }} · {{ n }}</span>
+              {% endfor %}
+            </td>
+            <td class="py-3 px-4 text-center font-bold text-primary">{{ s.total }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Liste des demandes -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4"><span class="text-[15px] font-semibold text-on-surface">{{ demandes|length }} demande(s)</span></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr><th class="py-3 px-4">Type</th><th class="py-3 px-4">Bénéficiaire</th><th class="py-3 px-4">Demandé par</th><th class="py-3 px-4">Date</th><th class="py-3 px-4">Statut</th><th class="py-3 px-4">Détails</th><th class="py-3 px-4 text-right">Actions</th></tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for d in demandes %}
+          <tr class="border-t border-surface-container-high hover:bg-surface-container-low/40">
+            <td class="py-3 px-4"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-secondary-fixed text-on-secondary-fixed font-medium">{{ d.type_demande.libelle if d.type_demande else "Autre" }}</span></td>
+            <td class="py-3 px-4 font-medium">{{ (d.employe_concerne.nom ~ " " ~ d.employe_concerne.prenom) if d.employe_concerne else "—" }}</td>
+            <td class="py-3 px-4 text-on-surface-variant text-[12.5px]">
+              {{ d.demandeur.nom if d.demandeur else "—" }}
+              {% if d.demandeur and d.demandeur.role != "Employé" %}
+              <span class="text-[11px] text-outline block">({{ d.demandeur.role }})</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ d.date_demande.strftime("%d/%m/%Y") if d.date_demande else "—" }}</td>
+            <td class="py-3 px-4">
+              {% if d.statut == "en_attente_n_plus_1" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#e0e7ff] text-[#3730a3] font-medium">Chez le N+1</span>
+              {% elif d.statut == "refusee_n_plus_1" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Refusée par N+1</span>
+              {% elif d.statut == "en_attente_rh" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fefcbf] text-[#975a16] font-medium">Chez les RH</span>
+              {% elif d.statut == "en_attente" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fefcbf] text-[#975a16] font-medium">En attente</span>
+              {% elif d.statut == "validee" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#c6f6d5] text-[#276749] font-medium">Validée</span>
+              {% elif d.statut == "refusee" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Refusée</span>
+              {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-surface-container-high text-on-surface-variant font-medium">{{ d.statut }}</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-[12px] text-on-surface-variant">
+              {% if d.periode_sollicitee_debut and d.periode_sollicitee_fin %}
+                <div><strong>Sollicitée :</strong> {{ d.periode_sollicitee_debut.strftime("%d/%m/%Y") }} → {{ d.periode_sollicitee_fin.strftime("%d/%m/%Y") }}</div>
+              {% elif d.donnees_specifiques %}
+                {% for cle, valeur in d.donnees_specifiques.items() %}<div>{{ cle }}: {{ valeur }}</div>{% endfor %}
+              {% endif %}
+              {% if d.periode_accordee_debut and d.periode_accordee_fin and (d.periode_accordee_debut != d.periode_sollicitee_debut or d.periode_accordee_fin != d.periode_sollicitee_fin) %}
+                <div class="text-[#975a16] mt-1"><strong>Accordée :</strong> {{ d.periode_accordee_debut.strftime("%d/%m/%Y") }} → {{ d.periode_accordee_fin.strftime("%d/%m/%Y") }}</div>
+              {% endif %}
+              {% if d.suppleant %}
+                <div class="mt-1 text-[11px]"><strong>Suppléant :</strong> {{ d.suppleant.nom }} {{ d.suppleant.prenom }}</div>
+              {% endif %}
+              {% if d.commentaire %}<em class="block mt-1">{{ d.commentaire }}</em>{% endif %}
+              {% if d.commentaire_n_plus_1 %}
+                <div class="mt-1 p-1 rounded bg-[#e0e7ff] text-[11px] text-[#3730a3]"><strong>N+1 :</strong> {{ d.commentaire_n_plus_1 }}</div>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-right whitespace-nowrap">
+              {% if d.statut in ("en_attente_rh", "en_attente_n_plus_1", "en_attente") %}
+              <a href="/demandes/{{ d.id }}/traiter-rh" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary-container text-white text-[12px] font-semibold hover:opacity-90 transition-all">
+                <span class="material-symbols-outlined text-[14px]">edit_note</span>
+                <span>Traiter</span>
+              </a>
+              {% elif d.statut == "refusee_n_plus_1" %}
+              <span class="text-[11px] text-[#9b2c2c] italic">Refus définitif</span>
+              {% elif d.statut == "validee" %}
+              <span class="text-[11px] text-[#276749] italic">✓ Validée</span>
+              {% elif d.statut == "refusee" %}
+              <span class="text-[11px] text-[#9b2c2c] italic">Refusée</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if not demandes %}
+      <p class="text-on-surface-variant text-[13px] p-5">Aucune demande pour cette sélection.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

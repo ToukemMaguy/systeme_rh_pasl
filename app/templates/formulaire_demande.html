@@ -1,0 +1,352 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Nouvelle demande{% endblock %}
+{% block content %}
+
+{% if erreur %}
+<div class="alert alert-danger"><span>{{ erreur }}</span></div>
+{% endif %}
+
+<div class="card" style="padding:24px;">
+  <form method="post" action="/demandes/nouvelle" enctype="multipart/form-data">
+    {{ csrf_input(request) }}
+    <div class="form-grid">
+      <div>
+        <label class="form-label">Type de demande</label>
+        <select name="type_demande_id" id="type_demande_id" class="form-control" required onchange="afficherBlocSpecifique()">
+          <option value="" {% if not valeurs.type_demande_id %}selected{% endif %}>-- Choisir --</option>
+          {% for t in types_demande %}
+          {% set cle = 'conge' if t.libelle == 'Congé' else ('recrutement' if t.libelle == 'Recrutement' else ('mutation' if t.libelle.startswith('Mutation') else ('depart' if t.libelle == 'Départ' else ('permission' if t.libelle == 'Permission' else ('absence' if t.libelle == 'Absence' else 'autre'))))) %}
+          <option value="{{ t.id }}" data-cle="{{ cle }}" {% if valeurs.type_demande_id == t.id %}selected{% endif %}>{{ t.libelle }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <!-- Demandeur : toujours l'utilisateur connecté (hidden) -->
+      <input type="hidden" name="demandeur_id" value="{{ request.session.get('user_id') }}">
+      {% if request.session.get('role') != 'Employé' %}
+      <div class="col-span-2">
+        <label class="form-label">Employé concerné (laisser vide pour une demande de recrutement)</label>
+        <select name="employe_concerne_id" class="form-control">
+          <option value="" {% if not valeurs.employe_concerne_id %}selected{% endif %}>-- Aucun --</option>
+          {% for e in employes %}
+          <option value="{{ e.id }}" {% if valeurs.employe_concerne_id == e.id %}selected{% endif %}>{{ e.nom }} {{ e.prenom }} ({{ e.matricule or "sans matricule" }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% else %}
+      <!-- Employé connecté : on met son employe_id en hidden -->
+      <input type="hidden" name="employe_concerne_id" value="{{ request.session.get('employe_id') }}">
+      {% endif %}
+    </div>
+
+        <!-- Bloc Suppléant (uniquement pour Congé / Permission / Absence) -->
+    <div class="form-grid" id="bloc-suppleant" style="display:none;">
+      <div class="col-span-2">
+        <label class="form-label">Suppléant pendant l'absence *</label>
+        <select name="suppleant_id" id="select-suppleant" class="form-control">
+          <option value="">— Choisir un suppléant —</option>
+          {% for e in employes_suppleants %}
+          <option value="{{ e.id }}"
+                  data-employe="{{ request.session.get('employe_id') or '' }}"
+                  {% if valeurs.suppleant_id == e.id %}selected{% endif %}>
+            {{ e.nom }} {{ e.prenom }} — {{ e.poste.intitule if e.poste else "sans poste" }}{% if e.departement %} ({{ e.departement.nom }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        <p class="text-muted" style="font-size:12px;margin:4px 0 0;">
+          Employé qui assurera vos tâches pendant votre absence. Vous devez vous être entendu avec lui au préalable.
+        </p>
+      </div>
+    </div>
+    <!-- Bloc Congé -->
+    <div class="form-grid bloc-specifique" data-bloc="conge" style="display:none;">
+      <div>
+        <label class="form-label">Date de début du congé</label>
+        <input type="date" name="date_debut_conge" class="form-control" value="{{ valeurs.date_debut_conge or '' }}">
+      </div>
+      <div>
+        <label class="form-label">Date de fin du congé</label>
+        <input type="date" name="date_fin_conge" class="form-control" value="{{ valeurs.date_fin_conge or '' }}">
+      </div>
+    </div>
+
+    <!-- Bloc Permission -->
+    <div class="form-grid bloc-specifique" data-bloc="permission" style="display:none;">
+      <div class="col-span-2">
+        <label class="form-label">Type de permission *</label>
+        <select name="permission_type_absence_id" id="permission-type" class="form-control">          <option value="">-- Choisir --</option>
+          {% for t in types_absence_permission %}
+          <option value="{{ t.id }}"
+                  data-duree="{{ t.duree_standard_jours or '' }}"
+                  data-plafond="{{ t.plafond_jours or '' }}"
+                  data-categorie="{{ t.categorie }}"
+                  data-genre-requis="{{ t.genre_requis or '' }}"
+                  {% if valeurs.permission_type_absence_id == t.id %}selected{% endif %}>{{ t.libelle }}{% if t.duree_standard_jours %} ({{ t.duree_standard_jours }}j){% endif %}</option>          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Date de début *</label>
+        <input type="date" name="permission_date_debut" id="permission-date-debut" class="form-control" value="{{ valeurs.permission_date_debut or '' }}">
+      </div>
+      <div>
+        <label class="form-label">Date de fin *</label>
+        <input type="date" name="permission_date_fin" id="permission-date-fin" class="form-control" value="{{ valeurs.permission_date_fin or '' }}">
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Motif</label>
+        <textarea name="permission_motif" class="form-control" rows="2" placeholder="Précisions sur la permission...">{{ valeurs.permission_motif or '' }}</textarea>
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Pièce justificative (optionnelle)</label>
+        <input type="file" name="permission_justificatif" class="form-control" accept="image/*,.pdf">
+        <p class="text-muted" style="font-size:12px;margin:4px 0 0;">Ajoutez un justificatif pour que votre permission soit traitée plus rapidement.</p>
+      </div>
+            <div class="col-span-2" id="permission-alerte" style="display:none;">
+        <div style="background:#FEF3C7;border-left:4px solid #D97706;padding:12px 16px;border-radius:6px;">
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <i class="fas fa-triangle-exclamation" style="color:#D97706;font-size:16px;margin-top:2px;"></i>
+            <div style="font-size:13px;color:#92400E;" id="permission-alerte-texte"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bloc Absence -->
+    <div class="form-grid bloc-specifique" data-bloc="absence" style="display:none;">
+      <div class="col-span-2">
+        <label class="form-label">Type d'absence *</label>
+        <select name="absence_type_absence_id" id="absence-type" class="form-control">
+          <option value="">-- Choisir --</option>
+          {% for t in types_absence_absence %}
+          <option value="{{ t.id }}"
+                  data-duree="{{ t.duree_standard_jours or '' }}"
+                  data-plafond="{{ t.plafond_jours or '' }}"
+                  data-categorie="{{ t.categorie }}"
+                  data-genre-requis="{{ t.genre_requis or '' }}"
+                  {% if valeurs.absence_type_absence_id == t.id %}selected{% endif %}>{{ t.libelle }}{% if t.duree_standard_jours %} ({{ t.duree_standard_jours }}j){% endif %}</option>          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Date de début *</label>
+        <input type="date" name="absence_date_debut" id="absence-date-debut" class="form-control" value="{{ valeurs.absence_date_debut or '' }}">
+      </div>
+      <div>
+        <label class="form-label">Date de fin *</label>
+        <input type="date" name="absence_date_fin" id="absence-date-fin" class="form-control" value="{{ valeurs.absence_date_fin or '' }}">
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Motif</label>
+        <textarea name="absence_motif" class="form-control" rows="2" placeholder="Précisions sur l'absence...">{{ valeurs.absence_motif or '' }}</textarea>
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Pièce justificative (optionnelle)</label>
+        <input type="file" name="absence_justificatif" class="form-control" accept="image/*,.pdf">
+        <p class="text-muted" style="font-size:12px;margin:4px 0 0;">Ajoutez un justificatif (certificat médical, acte...).</p>
+      </div>
+
+      <!-- ⬇️ NOUVEAU BLOC ALERTE -->
+      <div class="col-span-2" id="absence-alerte" style="display:none;">
+        <div style="background:#FEF3C7;border-left:4px solid #D97706;padding:12px 16px;border-radius:6px;">
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <i class="fas fa-triangle-exclamation" style="color:#D97706;font-size:16px;margin-top:2px;"></i>
+            <div style="font-size:13px;color:#92400E;" id="absence-alerte-texte"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bloc Recrutement -->
+    <div class="form-grid bloc-specifique" data-bloc="recrutement" style="display:none;">
+      <div>
+        <label class="form-label">Poste recherché</label>
+        <select name="poste_recherche_id" class="form-control">
+          <option value="">-- Choisir --</option>
+          {% for p in postes %}<option value="{{ p.id }}" {% if valeurs.poste_recherche_id == p.id %}selected{% endif %}>{{ p.intitule }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Département</label>
+        <select name="departement_recherche_id" class="form-control">
+          <option value="">-- Choisir --</option>
+          {% for d in departements %}<option value="{{ d.id }}" {% if valeurs.departement_recherche_id == d.id %}selected{% endif %}>{{ d.nom }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Nombre de postes</label>
+        <input type="number" name="nombre_postes" class="form-control" min="1" value="{{ valeurs.nombre_postes or 1 }}">
+      </div>
+    </div>
+
+    <!-- Bloc Mutation -->
+    <div class="form-grid bloc-specifique" data-bloc="mutation" style="display:none;">
+      <div>
+        <label class="form-label">Nouveau département</label>
+        <select name="nouveau_departement_id" class="form-control">
+          <option value="">-- Inchangé --</option>
+          {% for d in departements %}<option value="{{ d.id }}" {% if valeurs.nouveau_departement_id == d.id %}selected{% endif %}>{{ d.nom }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Nouvelle agence</label>
+        <select name="nouvelle_agence_id" class="form-control">
+          <option value="">-- Inchangée --</option>
+          {% for a in agences %}<option value="{{ a.id }}" {% if valeurs.nouvelle_agence_id == a.id %}selected{% endif %}>{{ a.nom }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Nouveau poste</label>
+        <select name="nouveau_poste_id" class="form-control">
+          <option value="">-- Inchangé --</option>
+          {% for p in postes %}<option value="{{ p.id }}" {% if valeurs.nouveau_poste_id == p.id %}selected{% endif %}>{{ p.intitule }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Date d'effet souhaitée</label>
+        <input type="date" name="date_effet_mutation" class="form-control" value="{{ valeurs.date_effet_mutation or '' }}">
+      </div>
+    </div>
+
+    <!-- Bloc Départ -->
+    <div class="form-grid bloc-specifique" data-bloc="depart" style="display:none;">
+      <div>
+        <label class="form-label">Date de départ</label>
+        <input type="date" name="date_depart" class="form-control" value="{{ valeurs.date_depart or '' }}">
+      </div>
+      <div>
+        <label class="form-label">Type de départ</label>
+        <select name="type_depart" class="form-control">
+          <option value="">-- Choisir --</option>
+          {% for opt in ["démission", "fin de contrat", "licenciement", "retraite"] %}
+          <option value="{{ opt }}" {% if valeurs.type_depart == opt %}selected{% endif %}>{{ opt|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="col-span-2">
+        <label class="form-label">Commentaire (optionnel)</label>
+        <textarea name="commentaire" class="form-control" rows="2">{{ valeurs.commentaire or '' }}</textarea>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-4">Envoyer la demande</button>
+  </form>
+</div>
+
+<script>
+  function afficherBlocSpecifique() {
+    var select = document.getElementById("type_demande_id");
+    var option = select.options[select.selectedIndex];
+    var cle = option ? option.getAttribute("data-cle") : null;
+
+    // Affichage des blocs spécifiques
+    document.querySelectorAll(".bloc-specifique").forEach(function (bloc) {
+      bloc.style.display = (bloc.getAttribute("data-bloc") === cle) ? "grid" : "none";
+    });
+
+    // Affichage du bloc Suppléant uniquement pour Congé / Permission / Absence
+    var blocSuppleant = document.getElementById("bloc-suppleant");
+    var selectSuppleant = document.getElementById("select-suppleant");
+    if (blocSuppleant && selectSuppleant) {
+      if (cle === "conge" || cle === "permission" || cle === "absence") {
+        blocSuppleant.style.display = "grid";
+        selectSuppleant.required = true;
+      } else {
+        blocSuppleant.style.display = "none";
+        selectSuppleant.required = false;
+        selectSuppleant.value = "";
+      }
+    }
+  }
+  document.addEventListener("DOMContentLoaded", afficherBlocSpecifique);
+
+  // ============================================
+  // ALERTES DE DÉPASSEMENT (Permission / Absence)
+  // ============================================
+
+  function ajouterJours(dateStr, nbJours) {
+    if (!dateStr) return null;
+    var d = new Date(dateStr);
+    d.setDate(d.getDate() + nbJours - 1);
+    return d.toISOString().split('T')[0];
+  }
+
+  function diffJours(d1Str, d2Str) {
+    if (!d1Str || !d2Str) return 0;
+    var d1 = new Date(d1Str);
+    var d2 = new Date(d2Str);
+    return Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+  }
+
+  function configurerBloc(prefixe) {
+    var selectType = document.getElementById(prefixe + '-type');
+    var dateDebut = document.getElementById(prefixe + '-date-debut');
+    var dateFin = document.getElementById(prefixe + '-date-fin');
+    var alerte = document.getElementById(prefixe + '-alerte');
+    var alerteTexte = document.getElementById(prefixe + '-alerte-texte');
+
+    if (!selectType || !dateDebut || !dateFin || !alerte) return;
+
+    function verifier() {
+      alerte.style.display = 'none';
+      alerteTexte.innerHTML = '';
+
+      var option = selectType.options[selectType.selectedIndex];
+      if (!option || !option.value || !dateDebut.value || !dateFin.value) return;
+
+      var nbJours = diffJours(dateDebut.value, dateFin.value);
+      var dureeStd = parseInt(option.getAttribute('data-duree') || '0');
+      var plafond = parseInt(option.getAttribute('data-plafond') || '0');
+      var categorie = option.getAttribute('data-categorie');
+
+      var messages = [];
+
+      // Cas 1 : Permissions avec plafond dépassé
+      if (categorie === 'Permission' && plafond && nbJours > plafond) {
+        var depasse = nbJours - plafond;
+        messages.push('Vous avez saisi ' + nbJours + ' jours, soit ' + depasse + ' jour(s) au-delà du plafond de ' + plafond + ' jours. Ces ' + depasse + ' jour(s) seront <strong>déduits de votre congé annuel</strong>.');
+      }
+
+      // Cas 2 : Durée standard dépassée
+      if (dureeStd && nbJours > dureeStd) {
+        var depasse2 = nbJours - dureeStd;
+        messages.push('La durée standard pour ce type est de ' + dureeStd + ' jours. Vous avez saisi ' + nbJours + ' jours, soit ' + depasse2 + ' jour(s) supplémentaire(s) qui <strong>pourront être déduits de votre congé annuel</strong>.');
+      }
+
+      if (messages.length > 0) {
+        alerteTexte.innerHTML = messages.join('<br>');
+        alerte.style.display = 'block';
+      }
+    }
+
+    selectType.addEventListener('change', function() {
+      var option = selectType.options[selectType.selectedIndex];
+      if (option && option.value) {
+        var duree = option.getAttribute('data-duree');
+        if (duree && dateDebut.value) {
+          dateFin.value = ajouterJours(dateDebut.value, parseInt(duree));
+        }
+      }
+      verifier();
+    });
+
+    dateDebut.addEventListener('change', function() {
+      var option = selectType.options[selectType.selectedIndex];
+      if (option && option.value) {
+        var duree = option.getAttribute('data-duree');
+        if (duree && dateDebut.value) {
+          dateFin.value = ajouterJours(dateDebut.value, parseInt(duree));
+        }
+      }
+      verifier();
+    });
+
+    dateFin.addEventListener('change', verifier);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    configurerBloc('permission');
+    configurerBloc('absence');
+  });
+</script>
+{% endblock %}

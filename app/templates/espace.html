@@ -1,0 +1,290 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Mon espace{% endblock %}
+{% block content %}
+<div class="flex flex-col gap-6 max-w-5xl">
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+
+    <!-- Ma fiche -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+      <div class="text-[13px] font-semibold text-primary uppercase tracking-wide mb-4">Ma fiche</div>
+      <div class="flex items-center gap-4">
+        {% if employe.photo_path %}
+        <img src="/{{ employe.photo_path }}" class="w-14 h-14 rounded-full object-cover" alt="">
+        {% else %}
+        <div class="w-14 h-14 rounded-full bg-primary-container text-white font-bold text-lg flex items-center justify-center">{{ (employe.prenom[0] if employe.prenom else '') ~ (employe.nom[0] if employe.nom else '') }}</div>
+        {% endif %}
+        <div>
+          <div class="font-bold text-on-surface text-[15px]">{{ employe.nom }} {{ employe.prenom }}</div>
+          <div class="text-[13px] text-on-surface-variant">{{ employe.poste.intitule if employe.poste else "—" }}</div>
+          <div class="flex gap-2 mt-1.5">
+            {% if employe.statut == "actif" %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#c6f6d5] text-[#276749] font-medium">Actif</span>{% else %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-surface-container-high text-on-surface-variant font-medium">Inactif</span>{% endif %}
+            {% if employe.grade %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-secondary-fixed text-on-secondary-fixed font-medium">{{ employe.grade.libelle }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-col">
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Matricule</span><span class="font-medium text-on-surface">{{ employe.matricule or "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Département</span><span class="font-medium text-on-surface">{{ employe.departement.nom if employe.departement else "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Agence</span><span class="font-medium text-on-surface">{{ employe.agence.nom if employe.agence else "Direction Générale" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Date d'embauche</span><span class="font-medium text-on-surface">{{ employe.date_embauche.strftime("%d/%m/%Y") if employe.date_embauche else "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Ancienneté</span><span class="font-medium text-on-surface">{{ anciennete }}</span></div>
+        <div class="flex justify-between py-2 text-[12.5px]">
+          <span class="text-on-surface-variant">Supérieur hiérarchique (N+1)</span>
+          <span class="font-medium text-on-surface">
+            {% if employe.n_plus_1 %}
+              {{ employe.n_plus_1.nom }} {{ employe.n_plus_1.prenom }}
+            {% else %}
+              <span class="text-on-surface-variant">Non défini</span>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      <div class="mt-4 flex gap-2">
+        <a href="/mes-infos" class="flex-1 h-10 flex items-center justify-center gap-2 bg-surface-container-high text-on-surface rounded-lg text-[13px] font-semibold hover:bg-surface-container-highest transition-all">
+          <span class="material-symbols-outlined text-[18px]">person</span>
+          <span>Voir ma fiche</span>
+        </a>
+        <a href="/mes-infos/pdf" target="_blank" class="flex-1 h-10 flex items-center justify-center gap-2 bg-primary-container text-white rounded-lg text-[13px] font-semibold hover:opacity-95 transition-all">
+          <span class="material-symbols-outlined text-[18px]">download</span>
+          <span>PDF</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Mon solde cumulé depuis l'embauche -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+      <div class="text-[13px] font-semibold text-primary uppercase tracking-wide mb-4">Mon solde de congés (depuis mon embauche)</div>
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="text-center p-3.5 bg-surface-container-low rounded-lg border border-surface-container-high">
+          <div class="text-2xl font-bold text-primary">{{ alloues_depuis_embauche }}j</div>
+          <div class="text-[11px] text-on-surface-variant mt-0.5">Alloués</div>
+        </div>
+        <div class="text-center p-3.5 bg-surface-container-low rounded-lg border border-surface-container-high">
+          <div class="text-2xl font-bold text-[#b7791f]">{{ pris_depuis_embauche | fmt_nombre }}j</div>
+          <div class="text-[11px] text-on-surface-variant mt-0.5">Pris</div>
+        </div>
+        <div class="text-center p-3.5 bg-surface-container-low rounded-lg border border-surface-container-high">
+          <div class="text-2xl font-bold text-[#276749]">{{ restants_depuis_embauche | fmt_nombre }}j</div>
+          <div class="text-[11px] text-on-surface-variant mt-0.5">Restants</div>
+        </div>
+      </div>
+      <div class="h-2 bg-surface-container rounded-full overflow-hidden">
+        <div class="h-full rounded-full bg-gradient-to-r from-primary-container to-secondary" style="width:{{ ([pris_depuis_embauche / alloues_depuis_embauche * 100, 100] | min) | round(0) if alloues_depuis_embauche else 0 }}%;"></div>
+      </div>
+      <p class="text-[11.5px] text-on-surface-variant mt-1.5 text-right">{{ ((pris_depuis_embauche / alloues_depuis_embauche * 100) | round(0)) if alloues_depuis_embauche else 0 }}% consommé — {{ quota_annuel }}j/an depuis {{ annees_comptees }} an(s)</p>
+      <a href="/demandes/nouvelle" class="mt-4 w-full h-10 flex items-center justify-center gap-2 bg-primary-container text-white rounded-lg text-[13px] font-semibold hover:opacity-95 transition-all">
+        <span class="material-symbols-outlined text-[18px]">add</span>
+        <span>Déposer une demande (congé, permission, absence)</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Mes sanctions disciplinaires -->
+  {% if mes_sanctions %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4">
+      <span class="text-[15px] font-semibold text-on-surface">Mes sanctions disciplinaires</span>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-semibold ml-2">{{ mes_sanctions|length }}</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Date</th>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Motif</th>
+            <th class="py-3 px-4">Durée</th>
+          </tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for s in mes_sanctions %}
+          <tr class="border-t border-surface-container-high">
+            <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap">{{ s.date_sanction.strftime("%d/%m/%Y") if s.date_sanction else "—" }}</td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">{{ s.type_sanction }}</span>
+            </td>
+            <td class="py-3 px-4">
+              {{ s.motif or "—" }}
+              {% if s.commentaire %}
+              <div class="text-[11px] text-on-surface-variant mt-1 italic">{{ s.commentaire }}</div>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ s.duree or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Mes absences enregistrées -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4"><span class="text-[15px] font-semibold text-on-surface">Mes absences enregistrées</span></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Période</th>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Motif</th>
+            <th class="py-3 px-4 text-center">Durée</th>
+            <th class="py-3 px-4 text-center">Statut</th>
+            <th class="py-3 px-4 text-center">Déduits</th>
+          </tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for a in mes_absences %}
+          <tr class="border-t border-surface-container-high {% if a.archivee %}opacity-50{% endif %}">
+            <td class="py-3 px-4">
+              Du {{ a.date_debut.strftime("%d/%m/%Y") if a.date_debut else "—" }}<br>
+              au {{ a.date_fin.strftime("%d/%m/%Y") if a.date_fin else "—" }}
+            </td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-secondary-fixed text-on-secondary-fixed font-medium">
+                {{ a.type_absence.libelle if a.type_absence else "—" }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ a.motif or "—" }}</td>
+            <td class="py-3 px-4 text-center font-semibold">
+              {{ duree_absence(a) }}j
+            </td>
+            <td class="py-3 px-4 text-center">
+              {% if a.justifiee %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#c6f6d5] text-[#276749] font-medium">Justifiée</span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Non justifiée</span>
+              {% endif %}
+              {% if a.archivee %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-surface-container-high text-on-surface-variant font-medium ml-1">Archivée</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-center font-semibold {% if a.jours_deduits_conges %}text-[#975a16]{% else %}text-on-surface-variant{% endif %}">
+              {{ a.jours_deduits_conges or 0 }}j
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if not mes_absences %}
+      <p class="text-on-surface-variant text-[13px] p-5">Aucune absence enregistrée pour l'instant.</p>
+      {% endif %}
+    </div>
+    {% if soldes %}
+    <div class="overflow-x-auto border-t border-surface-container-high">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr><th class="py-3 px-4">Année</th><th class="py-3 px-4 text-center">Alloués</th><th class="py-3 px-4 text-center">Pris</th><th class="py-3 px-4 text-center">Restants</th></tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for s in soldes %}
+          <tr class="border-t border-surface-container-high">
+            <td class="py-3 px-4 font-semibold">{{ s.annee }}</td>
+            <td class="py-3 px-4 text-center">{{ s.jours_alloues | fmt_nombre }}j</td>
+            <td class="py-3 px-4 text-center font-medium text-[#b7791f]">{{ s.jours_pris | fmt_nombre }}j</td>
+            <td class="py-3 px-4 text-center font-bold" style="color:{{ '#e53e3e' if s.jours_restants == 0 else ('#b7791f' if s.jours_restants <= 5 else '#276749') }};">{{ s.jours_restants | fmt_nombre }}j</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Mes demandes -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4 flex items-center justify-between">
+      <span class="text-[15px] font-semibold text-on-surface">Mes demandes</span>
+      <span class="text-[12px] text-on-surface-variant">{{ mes_demandes|length }} demande(s)</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Date de demande</th>
+            <th class="py-3 px-4">Détails</th>
+            <th class="py-3 px-4">Pièce jointe</th>
+            <th class="py-3 px-4">Statut</th>
+          </tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for d in mes_demandes %}
+          <tr class="border-t border-surface-container-high">
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-secondary-fixed text-on-secondary-fixed font-medium">
+                {{ d.type_demande.libelle if d.type_demande else "Autre" }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap">{{ d.date_demande.strftime("%d/%m/%Y") if d.date_demande else "—" }}</td>
+            <td class="py-3 px-4 text-[12px] text-on-surface-variant">
+              {% if d.periode_sollicitee_debut and d.periode_sollicitee_fin %}
+                <div><strong>Sollicitée :</strong> du {{ d.periode_sollicitee_debut.strftime("%d/%m/%Y") }} au {{ d.periode_sollicitee_fin.strftime("%d/%m/%Y") }}</div>
+              {% elif d.donnees_specifiques %}
+                {% if d.donnees_specifiques.date_debut and d.donnees_specifiques.date_fin %}
+                  <div>Du {{ d.donnees_specifiques.date_debut }} au {{ d.donnees_specifiques.date_fin }}</div>
+                {% endif %}
+                {% if d.donnees_specifiques.type_depart %}
+                  <div>Type : {{ d.donnees_specifiques.type_depart }}</div>
+                {% endif %}
+              {% endif %}
+              {% if d.periode_accordee_debut and d.periode_accordee_fin and (d.periode_accordee_debut != d.periode_sollicitee_debut or d.periode_accordee_fin != d.periode_sollicitee_fin) %}
+                <div class="text-[#975a16] mt-1"><strong>Accordée :</strong> du {{ d.periode_accordee_debut.strftime("%d/%m/%Y") }} au {{ d.periode_accordee_fin.strftime("%d/%m/%Y") }}</div>
+              {% endif %}
+              {% if d.donnees_specifiques and d.donnees_specifiques.motif %}
+                <div class="italic mt-1">"{{ d.donnees_specifiques.motif }}"</div>
+              {% endif %}
+              {% if d.commentaire %}
+                <div class="italic mt-1">{{ d.commentaire }}</div>
+              {% endif %}
+              {% if d.suppleant %}
+                <div class="mt-1 text-[11px]"><strong>Suppléant :</strong> {{ d.suppleant.nom }} {{ d.suppleant.prenom }}</div>
+              {% endif %}
+              {% if d.commentaire_n_plus_1 %}
+                <div class="mt-1 p-1.5 rounded bg-[#e0e7ff] text-[11px] text-[#3730a3]">
+                  <strong>Commentaire N+1 :</strong> {{ d.commentaire_n_plus_1 }}
+                </div>
+              {% endif %}
+              {% if d.statut == "refusee" and d.commentaire %}
+                <div class="mt-1 p-1.5 rounded bg-[#fed7d7] text-[11px] text-[#9b2c2c]">
+                  <strong>Motif du refus :</strong> {{ d.commentaire }}
+                </div>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-[12px]">
+              {% if d.donnees_specifiques and d.donnees_specifiques.justificatif_path %}
+                <a href="/{{ d.donnees_specifiques.justificatif_path }}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-container text-white text-[11px] font-semibold hover:opacity-90">
+                  <span class="material-symbols-outlined text-[14px]">attach_file</span>
+                  <span>Voir</span>
+                </a>
+              {% else %}
+                <span class="text-on-surface-variant text-[11px] italic">Aucune</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4">
+              {% if d.statut == "en_attente_n_plus_1" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#e0e7ff] text-[#3730a3] font-medium">Chez votre N+1</span>
+              {% elif d.statut == "refusee_n_plus_1" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Refusée par N+1</span>
+              {% elif d.statut == "en_attente_rh" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fefcbf] text-[#975a16] font-medium">Chez les RH</span>
+              {% elif d.statut == "validee" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#c6f6d5] text-[#276749] font-medium">Validée</span>
+              {% elif d.statut == "refusee" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Refusée par RH</span>
+              {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-surface-container-high text-on-surface-variant font-medium">{{ d.statut }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if not mes_demandes %}
+      <p class="text-on-surface-variant text-[13px] p-5">Aucune demande enregistrée.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

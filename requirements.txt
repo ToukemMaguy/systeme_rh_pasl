@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+jinja2
+python-multipart
+passlib[bcrypt]
+itsdangerous
+openpyxl
+# Ajouts : bibliothèques utilisées par le code mais absentes de la liste d'origine
+python-dotenv
+pymysql
+cryptography
+alembic
+reportlab
+pandas

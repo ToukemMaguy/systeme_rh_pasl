@@ -1,0 +1,253 @@
+{% extends "_layout.html" %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">{{ "Modifier " ~ valeurs.nom ~ " " ~ valeurs.prenom if mode == "edition" else "Ajouter un employé" }}</div>
+    <div class="page-subtitle">Fiche employé</div>
+  </div>
+</div>
+
+{% if erreur %}
+<div class="alert alert-danger"><span>{{ erreur }}</span></div>
+{% endif %}
+
+<div class="card" style="padding:24px;">
+  <form method="post" action="{{ '/employes/' ~ employe_id if mode == 'edition' else '/employes/nouveau' }}" enctype="multipart/form-data">
+    {{ csrf_input(request) }}
+    <div class="form-grid">
+      <div>
+        <label class="form-label">Nom</label>
+        <input type="text" name="nom" class="form-control" value="{{ valeurs.nom }}" required>
+      </div>
+      <div>
+        <label class="form-label">Prénom</label>
+        <input type="text" name="prenom" class="form-control" value="{{ valeurs.prenom }}" required>
+      </div>
+      <div>
+        <label class="form-label">Genre</label>
+        <select name="genre" class="form-control" required>
+          <option value="" {% if not valeurs.genre %}selected{% endif %} disabled>-- Choisir --</option>
+          <option value="H" {% if valeurs.genre == "H" %}selected{% endif %}>Homme</option>
+          <option value="F" {% if valeurs.genre == "F" %}selected{% endif %}>Femme</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Date de naissance (optionnel)</label>
+        <input type="date" name="date_naissance" class="form-control" value="{{ valeurs.date_naissance or '' }}">
+      </div>
+            <div>
+        <label class="form-label">Téléphone professionnel (optionnel)</label>
+        <input type="text" name="telephone_pro" class="form-control" value="{{ valeurs.telephone_pro or '' }}"
+               placeholder="ex: 6XX XXX XXX">
+      </div>
+      <div>
+        <label class="form-label">Téléphone personnel (optionnel)</label>
+        <input type="text" name="telephone_perso" class="form-control" value="{{ valeurs.telephone_perso or '' }}"
+               placeholder="ex: 6XX XXX XXX">
+      </div>
+      <div>
+        <label class="form-label">Email professionnel (optionnel)</label>
+        <input type="email" name="email_pro" class="form-control" value="{{ valeurs.email_pro or '' }}"
+               placeholder="ex: prenom.nom@pasl.cm">
+        <p class="text-muted" style="font-size:12px;margin:4px 0 0;">
+          Email PASL officiel — utilisé pour les communications internes et les notifications.
+        </p>
+      </div>
+      <div>
+        <label class="form-label">Email personnel (optionnel)</label>
+        <input type="email" name="email_perso" class="form-control" value="{{ valeurs.email_perso or '' }}"
+              placeholder="ex: prenom.nom@gmail.com">
+        <p class="text-muted" style="font-size:12px;margin:4px 0 0;">
+          Email personnel — utilisé en fallback pour les notifications.
+        </p>
+      </div>
+      <div>
+        <label class="form-label">Date d'embauche</label>
+        <input type="date" name="date_embauche" class="form-control" value="{{ valeurs.date_embauche or '' }}" required>
+      </div>
+      <div>
+        <label class="form-label">Matricule (optionnel)</label>
+        <input type="text" name="matricule" class="form-control" value="{{ valeurs.matricule or '' }}">
+      </div>
+      <div>
+        <label class="form-label">Département</label>
+        <select name="departement_id" id="select-departement" class="form-control" required onchange="filtrerN1()">
+          {% for d in departements %}
+          <option value="{{ d.id }}" {% if valeurs.departement_id == d.id %}selected{% endif %}>{{ d.nom }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Agence (optionnel)</label>
+        <select name="agence_id" class="form-control">
+          <option value="" {% if not valeurs.agence_id %}selected{% endif %}>Aucune (rattaché DG uniquement)</option>
+          {% for a in agences %}
+          <option value="{{ a.id }}" {% if valeurs.agence_id == a.id %}selected{% endif %}>{{ a.nom }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Poste</label>
+        <select name="poste_id" class="form-control" required>
+          {% for p in postes %}
+          <option value="{{ p.id }}" {% if valeurs.poste_id == p.id %}selected{% endif %}>{{ p.intitule }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Grade</label>
+        <select name="grade_id" class="form-control" required>
+          {% for g in grades %}
+          <option value="{{ g.id }}" {% if valeurs.grade_id == g.id %}selected{% endif %}>{{ g.libelle }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Statut matrimonial (optionnel)</label>
+        <select name="statut_matrimonial" class="form-control">
+          <option value="" {% if not valeurs.statut_matrimonial %}selected{% endif %}>— Non renseigné —</option>
+          {% for opt in ["Célibataire", "Marié(e)", "Divorcé(e)", "Veuf(ve)", "Union libre"] %}
+          <option value="{{ opt }}" {% if valeurs.statut_matrimonial == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Nombre d'enfants (optionnel)</label>
+        <input type="number" name="nombre_enfants" class="form-control" min="0" value="{{ valeurs.nombre_enfants if valeurs.nombre_enfants is not none else '' }}">
+      </div>
+      <div>
+        <label class="form-label">Contact d'urgence — Nom (optionnel)</label>
+        <input type="text" name="contact_urgence_nom" class="form-control" value="{{ valeurs.contact_urgence_nom or '' }}">
+      </div>
+      <div>
+        <label class="form-label">Contact d'urgence — Téléphone (optionnel)</label>
+        <input type="text" name="contact_urgence_tel" class="form-control" value="{{ valeurs.contact_urgence_tel or '' }}">
+      </div>
+            <div class="col-span-2">
+        <label class="form-label">Supérieur hiérarchique direct (N+1) — optionnel</label>
+        <select name="n_plus_1_id" id="select-n1" class="form-control">
+          <option value="" {% if not valeurs.n_plus_1_id %}selected{% endif %}>— Aucun —</option>
+        </select>
+        <p class="text-muted" style="font-size:12px;margin:4px 0 0;">
+          Seuls les employés du <strong>même département</strong> sont proposés. Changez d'abord le département pour voir d'autres options.
+        </p>
+      </div>
+
+
+      {% if mode == "edition" %}
+      <div class="col-span-2">
+        <label class="form-label">Motif du changement (si poste/département/agence/grade modifié)</label>
+        <input type="text" name="motif_changement" class="form-control" placeholder="ex: Promotion, mutation, réorganisation...">
+      </div>
+      {% endif %}
+    </div>
+
+    <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+      <div class="form-label" style="margin-bottom:12px;font-size:14px;">Pièces jointes</div>
+      <div class="form-grid">
+        <div>
+          <label class="form-label">Photo</label>
+          {% if valeurs.photo_path %}
+          <div style="margin-bottom:6px;"><a href="/{{ valeurs.photo_path }}" target="_blank" class="small text-muted"><i class="fas fa-image"></i> Fichier actuel</a></div>
+          {% endif %}
+          <input type="file" name="photo" class="form-control" accept="image/*">
+        </div>
+        <div>
+          <label class="form-label">Carte Nationale d'Identité</label>
+          {% if valeurs.cni_path %}
+          <div style="margin-bottom:6px;"><a href="/{{ valeurs.cni_path }}" target="_blank" class="small text-muted"><i class="fas fa-id-card"></i> Fichier actuel</a></div>
+          {% endif %}
+          <input type="file" name="cni" class="form-control" accept="image/*,.pdf">
+        </div>
+        <div class="col-span-2">
+          <label class="form-label">Plan de localisation</label>
+          {% if valeurs.plan_localisation_path %}
+          <div style="margin-bottom:6px;"><a href="/{{ valeurs.plan_localisation_path }}" target="_blank" class="small text-muted"><i class="fas fa-map"></i> Fichier actuel</a></div>
+          {% endif %}
+          <input type="file" name="plan_localisation" class="form-control" accept="image/*,.pdf">
+        </div>
+      </div>
+      <p class="small text-muted" style="margin-top:8px;">Laisser un champ vide conserve le fichier déjà enregistré.</p>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-4">Enregistrer</button>
+  </form>
+</div>
+
+{% if mode == "edition" %}
+<div class="card" style="padding:24px;margin-top:20px;">
+  <div class="chart-card-title" style="margin-bottom:{{ '4px' if historique else '0' }};">Historique de carrière</div>
+  {% if historique %}
+  <div class="timeline">
+    {% for a in historique %}
+    <div class="timeline-item{% if not a.date_fin %} timeline-item-current{% endif %}">
+      <div class="timeline-dot"></div>
+      <div class="timeline-content">
+        <div class="timeline-header">
+          <span class="timeline-title">{{ a.poste.intitule if a.poste else "Poste non renseigné" }}</span>
+          {% if not a.date_fin %}<span class="badge badge-success">Poste actuel</span>{% endif %}
+        </div>
+        <div class="timeline-meta">
+          {{ a.departement.nom if a.departement else "Département non renseigné" }}
+          {% if a.agence %} — {{ a.agence.nom }}{% endif %}
+          {% if a.grade %} · Grade : {{ a.grade.libelle }}{% endif %}
+        </div>
+        <div class="timeline-dates">
+          Du {{ a.date_debut.strftime("%d/%m/%Y") }}
+          {% if a.date_fin %} au {{ a.date_fin.strftime("%d/%m/%Y") }}{% else %} à aujourd'hui{% endif %}
+          {% if a.type_mouvement %} · <span class="text-muted">{{ a.type_mouvement | replace("_", " ") | capitalize }}</span>{% endif %}
+        </div>
+        {% if a.motif %}<div class="timeline-motif">{{ a.motif }}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-muted small">Aucun historique enregistré pour cet employé.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<script>
+  // Données des N+1 possibles (passées par Jinja)
+  const nPlus1Data = {{ n_plus_1_data | tojson }};
+  const nPlus1Selectionne = {{ valeurs.n_plus_1_id | tojson if valeurs.n_plus_1_id else 'null' }};
+
+  function filtrerN1() {
+    const selectDept = document.getElementById('select-departement');
+    const selectN1 = document.getElementById('select-n1');
+
+    if (!selectDept || !selectN1) return;
+
+    const deptId = selectDept.value ? parseInt(selectDept.value) : null;
+
+    // Vider le select N+1 (sauf la 1ère option)
+    selectN1.innerHTML = '<option value="">— Aucun —</option>';
+
+    if (!deptId) return;
+
+    // Filtrer les N+1 du même département
+    const candidats = nPlus1Data.filter(function(e) {
+      return e.departement_id === deptId;
+    });
+
+    // Trier par nom
+    candidats.sort(function(a, b) {
+      return (a.nom + a.prenom).localeCompare(b.nom + b.prenom);
+    });
+
+    candidats.forEach(function(e) {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = e.nom + ' ' + e.prenom + ' — ' + (e.poste || 'sans poste') + ' (' + (e.matricule || 'sans matricule') + ')';
+      if (nPlus1Selectionne && e.id === nPlus1Selectionne) {
+        opt.selected = true;
+      }
+      selectN1.appendChild(opt);
+    });
+  }
+
+  // Appel au chargement de la page
+  document.addEventListener('DOMContentLoaded', filtrerN1);
+</script>
+{% endblock %}

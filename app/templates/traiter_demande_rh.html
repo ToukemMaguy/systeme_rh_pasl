@@ -1,0 +1,122 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Traiter une demande{% endblock %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-3xl">
+
+  <div class="flex items-center gap-2 text-[13px]">
+    <a href="/demandes" class="text-primary hover:underline font-medium flex items-center gap-1">
+      <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+      Retour aux demandes
+    </a>
+  </div>
+
+  <div>
+    <h1 class="text-[22px] font-semibold text-on-surface">Traiter la demande</h1>
+    <p class="text-[13px] text-on-surface-variant mt-0.5">
+      Vous pouvez ajuster la période avant de valider ou de refuser
+    </p>
+  </div>
+
+  {% if erreur %}
+  <div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ erreur }}</div>
+  {% endif %}
+
+  <!-- Détails de la demande -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+    <div class="text-[13px] font-semibold text-primary uppercase tracking-wide mb-4">Détails</div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <div class="text-[11px] text-on-surface-variant uppercase font-semibold">Bénéficiaire</div>
+        <div class="text-[14px] text-on-surface font-medium mt-1">
+          {{ demande.employe_concerne.nom }} {{ demande.employe_concerne.prenom }}
+        </div>
+      </div>
+      <div>
+        <div class="text-[11px] text-on-surface-variant uppercase font-semibold">Type de demande</div>
+        <div class="text-[14px] text-on-surface font-medium mt-1">{{ type_libelle }}</div>
+      </div>
+      <div>
+        <div class="text-[11px] text-on-surface-variant uppercase font-semibold">Période sollicitée</div>
+        <div class="text-[14px] text-on-surface font-medium mt-1">
+          {% if demande.periode_sollicitee_debut and demande.periode_sollicitee_fin %}
+            Du {{ demande.periode_sollicitee_debut.strftime("%d/%m/%Y") }} au {{ demande.periode_sollicitee_fin.strftime("%d/%m/%Y") }}
+            <span class="text-[12px] text-outline block">({{ duree_demande(type_libelle, demande.periode_sollicitee_debut, demande.periode_sollicitee_fin) }})</span>
+          {% else %}
+            —
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        <div class="text-[11px] text-on-surface-variant uppercase font-semibold">Suppléant</div>
+        <div class="text-[14px] text-on-surface font-medium mt-1">
+          {% if demande.suppleant %}{{ demande.suppleant.nom }} {{ demande.suppleant.prenom }}{% else %}—{% endif %}
+        </div>
+      </div>
+      {% if demande.avis_n_plus_1 and demande.avis_n_plus_1 != "en_attente" %}
+      <div class="col-span-2">
+        <div class="text-[11px] text-on-surface-variant uppercase font-semibold">Avis du N+1</div>
+        <div class="text-[14px] mt-1">
+          {% if demande.avis_n_plus_1 == "favorable" %}
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#c6f6d5] text-[#276749] font-medium">Favorable</span>
+          {% elif demande.avis_n_plus_1 == "defavorable" %}
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Défavorable</span>
+          {% endif %}
+          {% if demande.commentaire_n_plus_1 %}
+          <div class="text-[12px] text-on-surface-variant italic mt-1">"{{ demande.commentaire_n_plus_1 }}"</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% if demande.commentaire %}
+      <div class="col-span-2">
+        <div class="text-[11px] text-on-surface-variant uppercase font-semibold">Motif / Commentaire initial</div>
+        <div class="text-[14px] text-on-surface mt-1 italic">"{{ demande.commentaire }}"</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Formulaire de décision -->
+  <form method="post" action="/demandes/{{ demande.id }}/traiter-rh" class="flex flex-col gap-4">
+    {{ csrf_input(request) }}
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+      <div class="text-[13px] font-semibold text-primary uppercase tracking-wide mb-4">Ajustement de la période (optionnel)</div>
+
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Période accordée — Début</label>
+          <input type="date" name="periode_accordee_debut"
+                 value="{{ demande.periode_accordee_debut.strftime('%Y-%m-%d') if demande.periode_accordee_debut else (demande.periode_sollicitee_debut.strftime('%Y-%m-%d') if demande.periode_sollicitee_debut else '') }}"
+                 class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20">
+        </div>
+        <div>
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Période accordée — Fin</label>
+          <input type="date" name="periode_accordee_fin"
+                 value="{{ demande.periode_accordee_fin.strftime('%Y-%m-%d') if demande.periode_accordee_fin else (demande.periode_sollicitee_fin.strftime('%Y-%m-%d') if demande.periode_sollicitee_fin else '') }}"
+                 class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Commentaire RH (optionnel)</label>
+        <textarea name="commentaire_rh" rows="3" class="w-full px-3 py-2 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="Justification de la décision, précisions..."></textarea>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3 justify-end flex-wrap">
+      <a href="/demandes" class="inline-flex items-center h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold hover:bg-surface-container-highest transition-colors">
+        Annuler
+      </a>
+      <button type="submit" name="action" value="refuser" class="inline-flex items-center gap-2 h-[38px] px-5 rounded-lg bg-[#fed7d7] text-[#9b2c2c] text-[13px] font-semibold hover:bg-[#fbb] transition-colors">
+        <span class="material-symbols-outlined text-[18px]">cancel</span>
+        <span>Refuser</span>
+      </button>
+      <button type="submit" name="action" value="valider" class="inline-flex items-center gap-2 h-[38px] px-5 rounded-lg bg-[#38a169] text-white text-[13px] font-semibold hover:bg-[#2f855a] transition-colors">
+        <span class="material-symbols-outlined text-[18px]">check_circle</span>
+        <span>Valider</span>
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

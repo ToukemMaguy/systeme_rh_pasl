@@ -1,0 +1,106 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Modifier mes informations{% endblock %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-3xl">
+
+  <div class="flex items-center gap-2 text-[13px]">
+    <a href="/mes-infos" class="text-primary hover:underline font-medium flex items-center gap-1">
+      <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+      Retour à ma fiche
+    </a>
+  </div>
+
+  <div>
+    <h1 class="text-[22px] font-semibold text-on-surface">Modifier mes informations</h1>
+    <p class="text-[13px] text-on-surface-variant mt-0.5">Vous pouvez modifier uniquement vos informations personnelles</p>
+  </div>
+
+  {% if succes %}
+  <div class="px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px]">{{ succes }}</div>
+  {% endif %}
+  {% if erreur %}
+  <div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ erreur }}</div>
+  {% endif %}
+
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+    <div class="text-[13px] font-semibold text-primary uppercase tracking-wide mb-4">Informations personnelles modifiables</div>
+
+    <form method="post" action="/mes-infos/modifier" enctype="multipart/form-data">
+      {{ csrf_input(request) }}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div>
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Téléphone personnel</label>
+          <input type="text" name="telephone_perso" value="{{ employe.telephone_perso or '' }}"
+                 class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                 placeholder="ex: 6XX XXX XXX">
+        </div>
+
+        <div>
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Email personnel</label>
+          <input type="email" name="email_perso" value="{{ employe.email_perso or '' }}"
+                 class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                 placeholder="ex: nom@email.com">
+        </div>
+
+        <div>
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Statut matrimonial</label>
+          <select name="statut_matrimonial" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20">
+            <option value="" {% if not employe.statut_matrimonial %}selected{% endif %}>— Non renseigné —</option>
+            {% for opt in ["Célibataire", "Marié(e)", "Divorcé(e)", "Veuf(ve)", "Union libre"] %}
+            <option value="{{ opt }}" {% if employe.statut_matrimonial == opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Nombre d'enfants</label>
+          <input type="number" name="nombre_enfants" min="0" value="{{ employe.nombre_enfants if employe.nombre_enfants is not none else '' }}"
+                 class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20">
+        </div>
+
+        <div>
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Contact d'urgence — Nom</label>
+          <input type="text" name="contact_urgence_nom" value="{{ employe.contact_urgence_nom or '' }}"
+                 class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20">
+        </div>
+
+        <div>
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Contact d'urgence — Téléphone</label>
+          <input type="text" name="contact_urgence_tel" value="{{ employe.contact_urgence_tel or '' }}"
+                 class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Photo de profil</label>
+          {% if employe.photo_path %}
+          <div class="flex items-center gap-3 mb-2">
+            <img src="/{{ employe.photo_path }}" class="w-14 h-14 rounded-full object-cover" alt="">
+            <span class="text-[12px] text-on-surface-variant">Photo actuelle</span>
+          </div>
+          {% endif %}
+          <input type="file" name="photo" accept="image/*"
+                 class="w-full text-[13px] text-on-surface-variant file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20">
+          <p class="text-[11px] text-on-surface-variant mt-1">Laisser vide pour conserver la photo actuelle.</p>
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-surface-container-high flex flex-wrap gap-3 justify-end">
+        <a href="/mes-infos" class="inline-flex items-center h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold hover:bg-surface-container-highest transition-colors">
+          Annuler
+        </a>
+        <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-5 rounded-lg bg-primary-container text-white text-[13px] font-semibold hover:opacity-95">
+          <span class="material-symbols-outlined text-[18px]">save</span>
+          <span>Enregistrer les modifications</span>
+        </button>
+      </div>
+    </form>
+
+    <div class="mt-6 pt-4 border-t border-surface-container-high">
+      <p class="text-[12px] text-on-surface-variant italic">
+        <strong>Pour information :</strong> les autres informations (nom, matricule, poste, département, grade, date d'embauche, N+1) sont gérées par les RH et ne sont pas modifiables ici.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

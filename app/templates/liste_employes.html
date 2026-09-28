@@ -1,0 +1,259 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Employés{% endblock %}
+{% block content %}
+<style>
+  /* ---- Menu déroulant PDF dans la liste ---- */
+  .dropdown-pdf-liste { position: relative; display: inline-block; }
+  .dropdown-pdf-liste .dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    min-width: 210px;
+    z-index: 50;
+    overflow: hidden;
+  }
+  .dropdown-pdf-liste .dropdown-menu.show { display: block; }
+  .dropdown-pdf-liste .dropdown-menu a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    color: #151c27;
+    text-decoration: none;
+    font-size: 12.5px;
+    transition: background 0.12s;
+  }
+  .dropdown-pdf-liste .dropdown-menu a:hover { background: #f0f3ff; }
+  .dropdown-pdf-liste .dropdown-menu a .material-symbols-outlined {
+    font-size: 16px;
+    color: #06547a;
+  }
+</style>
+<div class="flex flex-col w-full gap-6">
+
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="flex flex-col">
+      <div class="flex items-center gap-2">
+        <h1 class="text-2xl font-semibold text-on-surface tracking-tight">Gestion du personnel &amp; Répertoire</h1>
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[12px] bg-surface-container-high text-primary font-semibold">{{ total_actifs }} actifs</span>
+      </div>
+      <p class="text-[14px] text-on-surface-variant mt-0.5">Registre centralisé des collaborateurs, organisé par agence</p>
+    </div>
+    <a href="/employes/nouveau" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-primary-container text-white shadow-sm hover:opacity-95 transition-all text-[13px] font-semibold self-start">
+      <span class="material-symbols-outlined text-[19px]">person_add</span>
+      <span>Ajouter un employé</span>
+    </a>
+  </div>
+
+  {% if request.query_params.get('ok') %}
+  <div class="px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px] flex items-center justify-between">
+    <span>{{ request.query_params.get('ok') }}</span>
+  </div>
+  {% endif %}
+
+  <!-- Filtres (masquables) -->
+  <section class="bg-surface-container-lowest rounded-xl shadow-sm p-5 zone-filtres" id="zone-filtres-employes">
+    <div class="flex items-center justify-between">
+      <button type="button" onclick="toggleFiltres('zone-filtres-employes')" class="btn-toggle-filtres inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold hover:bg-surface-container-highest transition-all">
+        <span class="material-symbols-outlined text-[18px]">filter_list</span>
+        <span>Filtres multicritères</span>
+        <span class="badge-filtres-actifs inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-primary-container text-white text-[11px] font-bold" style="display:none;"></span>
+      </button>
+    </div>
+
+    <div class="filtres-contenu" style="display:none;margin-top:16px;">
+      <form method="get" action="/employes" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3.5">
+        <div class="lg:col-span-4 flex flex-col gap-1">
+          <label class="text-[12px] text-on-surface-variant font-medium">Recherche générale</label>
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">search</span>
+            <input type="text" name="q" value="{{ q }}" class="w-full h-[38px] pl-9 pr-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="Nom, prénom ou matricule...">
+          </div>
+        </div>
+        <div class="lg:col-span-2 flex flex-col gap-1">
+          <label class="text-[12px] text-on-surface-variant font-medium">Département</label>
+          <select name="departement_id" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+            <option value="">Tous les départements</option>
+            {% for d in departements %}
+            <option value="{{ d.id }}" {% if departement_id == d.id|string %}selected{% endif %}>{{ d.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="lg:col-span-2 flex flex-col gap-1">
+          <label class="text-[12px] text-on-surface-variant font-medium">Agence</label>
+          <select name="agence_id" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+            <option value="">Toutes les agences</option>
+            {% for a in agences %}
+            <option value="{{ a.id }}" {% if agence_id == a.id|string %}selected{% endif %}>{{ a.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="lg:col-span-2 flex flex-col gap-1">
+          <label class="text-[12px] text-on-surface-variant font-medium">Sexe</label>
+          <select name="sexe" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+            <option value="">Tous</option>
+            <option value="H" {% if sexe == "H" %}selected{% endif %}>Homme</option>
+            <option value="F" {% if sexe == "F" %}selected{% endif %}>Femme</option>
+          </select>
+        </div>
+        <div class="lg:col-span-2 flex flex-col gap-1">
+          <label class="text-[12px] text-on-surface-variant font-medium">Tranche d'âge</label>
+          <select name="tranche_age" class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer">
+            <option value="">Toutes</option>
+            {% for t in ["≤25", "26-35", "36-45", "46-55", "56+"] %}
+            <option value="{{ t }}" {% if tranche_age == t %}selected{% endif %}>{{ t }} ans</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="lg:col-span-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+          <span class="text-[12px] text-on-surface-variant font-medium whitespace-nowrap">Embauché entre le</span>
+          <input type="date" name="embauche_debut" value="{{ embauche_debut }}" class="flex-1 h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+          <span class="text-[12px] text-on-surface-variant font-medium">et le</span>
+          <input type="date" name="embauche_fin" value="{{ embauche_fin }}" class="flex-1 h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+        </div>
+        <div class="lg:col-span-7 flex items-center justify-end gap-3 pt-1">
+          <a href="/employes" class="text-[13px] text-on-surface-variant hover:text-primary underline underline-offset-4">Réinitialiser les filtres</a>
+          <button type="submit" class="inline-flex items-center justify-center gap-2 h-[38px] px-5 rounded-lg bg-primary-container text-white text-[13px] font-semibold shadow-sm hover:opacity-95 transition-all">
+            <span class="material-symbols-outlined text-[18px]">search</span>
+            <span>Filtrer</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Groupes par agence -->
+  <div class="flex flex-col gap-4">
+    {% for nom_agence, liste in agences_groupees %}
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+      <div class="p-4 hover:bg-surface-container-low/60 cursor-pointer flex items-center justify-between gap-3 transition-colors" onclick="toggleAccordion('{{ loop.index }}')">
+        <div class="flex items-center gap-3.5">
+          <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+            <span class="material-symbols-outlined text-[22px]">{{ "corporate_fare" if nom_agence == "Direction Générale" else "storefront" }}</span>
+          </div>
+          <div class="flex flex-col">
+            <div class="flex items-center gap-2">
+              <span class="text-[15px] text-on-surface font-semibold">{{ nom_agence }}</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] bg-secondary-fixed text-on-secondary-fixed font-medium">{{ liste|length }} collaborateur{{ 's' if liste|length > 1 else '' }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant" id="icon-{{ loop.index }}">
+          <span class="material-symbols-outlined text-[22px]">expand_less</span>
+        </div>
+      </div>
+      <div class="overflow-x-auto" id="content-{{ loop.index }}">
+        <table class="w-full text-left text-[13px]">
+          <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+            <tr>
+              <th class="py-3 px-4">Collaborateur</th>
+              <th class="py-3 px-4">Poste actuel</th>
+              <th class="py-3 px-4">Département</th>
+              <th class="py-3 px-4">Âge / Sexe</th>
+              <th class="py-3 px-4">Embauche</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="text-on-surface">
+            {% for e in liste %}
+            <tr class="hover:bg-surface-container-low/40 transition-colors border-t border-surface-container-high">
+              <td class="py-3 px-4">
+                <div class="flex items-center gap-3">
+                  {% if e.photo_path %}
+                  <img src="/{{ e.photo_path }}" class="w-9 h-9 rounded-full object-cover">
+                  {% else %}
+                  <div class="w-9 h-9 rounded-full bg-tertiary-fixed text-primary font-semibold flex items-center justify-center text-[13px]">
+                    {{ (e.prenom[0] if e.prenom else '') ~ (e.nom[0] if e.nom else '') }}
+                  </div>
+                  {% endif %}
+                  <div class="flex flex-col">
+                    <span class="font-semibold text-on-surface">{{ e.nom }} {{ e.prenom }}</span>
+                    <span class="text-[11px] text-on-surface-variant font-mono">{{ e.matricule or "—" }}</span>
+                  </div>
+                </div>
+              </td>
+              <td class="py-3 px-4 font-medium">{{ e.poste.intitule if e.poste else "—" }}</td>
+              <td class="py-3 px-4 text-on-surface-variant">{{ e.departement.nom if e.departement else "—" }}</td>
+              <td class="py-3 px-4">
+                {% set age = age_annees(e.date_naissance) %}
+                <span class="font-medium">{{ (age ~ " ans") if age else "—" }}</span>
+                <span class="text-on-surface-variant text-[11px]">({{ e.genre }})</span>
+              </td>
+              <td class="py-3 px-4 font-mono text-on-surface-variant">{{ e.date_embauche.strftime("%d/%m/%Y") if e.date_embauche else "—" }}</td>
+              <td class="py-3 px-4 text-right">
+                <div class="inline-flex items-center gap-1.5 justify-end">
+                  <a href="/employes/{{ e.id }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container text-primary text-[12px] font-semibold hover:bg-primary hover:text-white transition-colors">
+                    <span class="material-symbols-outlined text-[16px]">visibility</span>
+                    <span>Voir la fiche</span>
+                  </a>
+                  <div class="dropdown-pdf-liste">
+                    <button type="button" onclick="togglePdfMenu(event, 'pdf-menu-{{ e.id }}')" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-container-high text-on-surface text-[12px] font-semibold hover:bg-surface-container-highest transition-colors">
+                      <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                      <span class="material-symbols-outlined text-[14px]">expand_more</span>
+                    </button>
+                    <div id="pdf-menu-{{ e.id }}" class="dropdown-menu">
+                      <a href="/employes/{{ e.id }}/pdf/fiche" target="_blank">
+                        <span class="material-symbols-outlined">badge</span>
+                        <span>Fiche employé</span>
+                      </a>
+                      <a href="/employes/{{ e.id }}/pdf/certificat" target="_blank">
+                        <span class="material-symbols-outlined">workspace_premium</span>
+                        <span>Certificat de travail</span>
+                      </a>
+                      <a href="/employes/{{ e.id }}/pdf/attestation" target="_blank">
+                        <span class="material-symbols-outlined">description</span>
+                        <span>Attestation de travail</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+
+    {% if not agences_groupees %}
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 text-center text-on-surface-variant text-[14px]">
+      Aucun employé ne correspond à ces critères.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  function toggleAccordion(id) {
+    var content = document.getElementById('content-' + id);
+    var icon = document.getElementById('icon-' + id);
+    var estOuvert = content.style.display !== 'none';
+    content.style.display = estOuvert ? 'none' : 'block';
+    icon.querySelector('.material-symbols-outlined').textContent = estOuvert ? 'expand_more' : 'expand_less';
+  }
+</script>
+<script>
+  function togglePdfMenu(event, menuId) {
+    event.stopPropagation();
+    document.querySelectorAll('.dropdown-menu.show').forEach(function(m) {
+      if (m.id !== menuId) m.classList.remove('show');
+    });
+    var menu = document.getElementById(menuId);
+    if (menu) menu.classList.toggle('show');
+  }
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown-pdf-liste')) {
+      document.querySelectorAll('.dropdown-menu.show').forEach(function(m) {
+        m.classList.remove('show');
+      });
+    }
+  });
+</script>
+{% endblock %}

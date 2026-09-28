@@ -1,0 +1,67 @@
+{% extends "_layout.html" %}
+{% block title %}Procédure de licenciement{% endblock %}
+{% block breadcrumb %}Engager une procédure de licenciement{% endblock %}
+{% block content %}
+{# [ÉTAPE 3] Ouverture d'un dossier de licenciement (RH) #}
+{% set champ = "w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20" %}
+<div class="flex flex-col gap-4 max-w-3xl">
+  <a href="/employes/{{ employe.id }}?onglet=disciplinaire" class="text-primary hover:underline font-medium flex items-center gap-1 text-[13px]">
+    <span class="material-symbols-outlined text-[16px]">arrow_back</span> Retour à la fiche
+  </a>
+  <div>
+    <h1 class="text-[22px] font-semibold text-on-surface">Engager une procédure de licenciement</h1>
+    <p class="text-[13px] text-on-surface-variant mt-0.5">
+      {{ employe.nom }} {{ employe.prenom }} — {{ employe.poste.intitule if employe.poste else "" }} — ancienneté {{ anciennete }}.
+      Le dossier reste confidentiel (RH, puis Comité de direction après transmission).
+    </p>
+  </div>
+  {% if erreur %}<div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ erreur }}</div>{% endif %}
+
+  <form method="post" action="/employes/{{ employe.id }}/licenciement/nouveau" class="bg-surface-container-lowest rounded-xl shadow-sm p-5 flex flex-col gap-4">
+    {{ csrf_input(request) }}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Motif du licenciement *</label>
+        <select name="type_motif" required class="{{ champ }}">
+          <option value="">— Choisir —</option>
+          {% for t in types_motif %}<option value="{{ t }}" {% if valeurs.type_motif == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Date des faits</label>
+        <input type="date" name="date_faits" value="{{ valeurs.date_faits or '' }}" class="{{ champ }}">
+      </div>
+    </div>
+    <div>
+      <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Exposé des faits reprochés *</label>
+      <textarea name="expose_faits" rows="5" required class="w-full px-3 py-2 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="Faits précis, dates, lieux, personnes concernées...">{{ valeurs.expose_faits or '' }}</textarea>
+    </div>
+    {% if sanctions %}
+    <div>
+      <div class="text-[12px] text-on-surface-variant font-medium mb-1">Sanctions antérieures à rattacher au dossier</div>
+      <div class="flex flex-col gap-1.5 text-[13px]">
+        {% for s in sanctions %}
+        <label class="flex items-center gap-2"><input type="checkbox" name="sanctions_liees" value="{{ s.id }}">
+          {{ s.type_sanction }} du {{ s.date_sanction.strftime("%d/%m/%Y") }} — <span class="text-on-surface-variant">{{ (s.motif or "")[:80] }}</span></label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="border-t border-surface-container-high pt-4">
+      <label class="flex items-center gap-2 text-[13px] font-medium"><input type="checkbox" name="mise_a_pied_conservatoire" value="1"
+             onchange="document.getElementById('dates-map').style.display = this.checked ? 'grid' : 'none'"> Mise à pied conservatoire pendant la procédure</label>
+      <div id="dates-map" class="grid grid-cols-2 gap-4 mt-3" style="display:none;">
+        <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Du</label><input type="date" name="mise_a_pied_debut" class="{{ champ }}"></div>
+        <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Au</label><input type="date" name="mise_a_pied_fin" class="{{ champ }}"></div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-3">
+      <a href="/employes/{{ employe.id }}" class="inline-flex items-center h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold">Annuler</a>
+      <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-5 rounded-lg bg-primary-container text-white text-[13px] font-semibold">
+        <span class="material-symbols-outlined text-[18px]">gavel</span> Ouvrir le dossier
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

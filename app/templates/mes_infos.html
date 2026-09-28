@@ -1,0 +1,190 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Ma fiche complète{% endblock %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-5xl">
+
+  <div class="flex items-center gap-2 text-[13px]">
+    <a href="/espace" class="text-primary hover:underline font-medium flex items-center gap-1">
+      <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+      Retour à mon espace
+    </a>
+  </div>
+
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-[22px] font-semibold text-on-surface">Ma fiche complète</h1>
+      <p class="text-[13px] text-on-surface-variant mt-0.5">Consultez et modifiez vos informations personnelles</p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <a href="/mes-infos/modifier" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold hover:bg-surface-container-highest transition-all">
+        <span class="material-symbols-outlined text-[18px]">edit</span>
+        <span>Modifier mes infos</span>
+      </a>
+      <a href="/mes-infos/pdf" target="_blank" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-primary-container text-white text-[13px] font-semibold hover:opacity-95 transition-all">
+        <span class="material-symbols-outlined text-[18px]">download</span>
+        <span>Télécharger PDF</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Infos personnelles + pro -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+    <!-- Infos personnelles -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+      <div class="text-[13px] font-semibold text-primary uppercase tracking-wide mb-4">Informations personnelles</div>
+      <div class="flex flex-col">
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Matricule</span><span class="font-medium text-on-surface">{{ employe.matricule or "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Nom complet</span><span class="font-medium text-on-surface">{{ employe.nom }} {{ employe.prenom }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Genre</span><span class="font-medium text-on-surface">{{ "Homme" if employe.genre == "H" else "Femme" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Date de naissance</span><span class="font-medium text-on-surface">{{ employe.date_naissance.strftime("%d/%m/%Y") if employe.date_naissance else "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Âge</span><span class="font-medium text-on-surface">{{ age ~ " ans" if age else "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Statut matrimonial</span><span class="font-medium text-on-surface">{{ employe.statut_matrimonial or "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Nombre d'enfants</span><span class="font-medium text-on-surface">{{ employe.nombre_enfants if employe.nombre_enfants is not none else "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Téléphone professionnel</span><span class="font-medium text-on-surface">{{ employe.telephone_pro or "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Téléphone personnel</span><span class="font-medium text-on-surface">{{ employe.telephone_perso or "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Email personnel</span><span class="font-medium text-on-surface">{{ employe.email_perso or "—" }}</span></div>
+        <div class="flex justify-between py-2 text-[12.5px]"><span class="text-on-surface-variant">Contact d'urgence</span><span class="font-medium text-on-surface">{{ employe.contact_urgence_nom or "—" }} — {{ employe.contact_urgence_tel or "—" }}</span></div>
+      </div>
+    </div>
+
+    <!-- Infos professionnelles -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+      <div class="text-[13px] font-semibold text-primary uppercase tracking-wide mb-4">Informations professionnelles</div>
+      <div class="flex flex-col">
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Département</span><span class="font-medium text-on-surface">{{ employe.departement.nom if employe.departement else "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Agence</span><span class="font-medium text-on-surface">{{ employe.agence.nom if employe.agence else "Direction Générale" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Poste</span><span class="font-medium text-on-surface">{{ employe.poste.intitule if employe.poste else "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Grade</span><span class="font-medium text-on-surface">{{ employe.grade.libelle if employe.grade else "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Date d'embauche</span><span class="font-medium text-on-surface">{{ employe.date_embauche.strftime("%d/%m/%Y") if employe.date_embauche else "—" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Ancienneté</span><span class="font-medium text-on-surface">{{ anciennete }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Statut</span>
+          <span>{% if employe.statut == "actif" %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#c6f6d5] text-[#276749] font-medium">Actif</span>{% else %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-surface-container-high text-on-surface-variant font-medium">Inactif</span>{% endif %}</span>
+        </div>
+        <div class="flex justify-between py-2 text-[12.5px]"><span class="text-on-surface-variant">N+1</span>
+          <span class="font-medium text-on-surface">{% if employe.n_plus_1 %}{{ employe.n_plus_1.nom }} {{ employe.n_plus_1.prenom }}{% else %}Non défini{% endif %}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historique de carrière -->
+  {% if historique %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4"><span class="text-[15px] font-semibold text-on-surface">Historique de carrière</span></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr><th class="py-3 px-4">Type</th><th class="py-3 px-4">Début</th><th class="py-3 px-4">Fin</th><th class="py-3 px-4">Poste</th><th class="py-3 px-4">Département / Agence</th><th class="py-3 px-4">Grade</th></tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for h in historique %}
+          <tr class="border-t border-surface-container-high">
+            <td class="py-3 px-4 capitalize">{{ h.type_mouvement.replace('_', ' ') if h.type_mouvement else "—" }}</td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ h.date_debut.strftime("%d/%m/%Y") if h.date_debut else "—" }}</td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ h.date_fin.strftime("%d/%m/%Y") if h.date_fin else "En cours" }}</td>
+            <td class="py-3 px-4">{{ h.poste.intitule if h.poste else "—" }}</td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ h.departement.nom if h.departement else "—" }}{% if h.agence %} / {{ h.agence.nom }}{% endif %}</td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ h.grade.libelle if h.grade else "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Soldes de congés -->
+  {% if soldes %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4"><span class="text-[15px] font-semibold text-on-surface">Mes soldes de congés par année</span></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr><th class="py-3 px-4">Année</th><th class="py-3 px-4 text-center">Alloués</th><th class="py-3 px-4 text-center">Pris</th><th class="py-3 px-4 text-center">Restants</th></tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for s in soldes %}
+          <tr class="border-t border-surface-container-high">
+            <td class="py-3 px-4 font-semibold">{{ s.annee }}</td>
+            <td class="py-3 px-4 text-center">{{ s.jours_alloues | fmt_nombre }}j</td>
+            <td class="py-3 px-4 text-center font-medium text-[#b7791f]">{{ s.jours_pris | fmt_nombre }}j</td>
+            <td class="py-3 px-4 text-center font-bold" style="color:{{ '#e53e3e' if s.jours_restants == 0 else ('#b7791f' if s.jours_restants <= 5 else '#276749') }};">{{ s.jours_restants | fmt_nombre }}j</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Absences -->
+  {% if mes_absences %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4"><span class="text-[15px] font-semibold text-on-surface">Mes absences</span></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr><th class="py-3 px-4">Période</th><th class="py-3 px-4">Type</th><th class="py-3 px-4">Motif</th><th class="py-3 px-4 text-center">Durée</th><th class="py-3 px-4 text-center">Statut</th><th class="py-3 px-4 text-center">Déduits</th></tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for a in mes_absences %}
+          <tr class="border-t border-surface-container-high {% if a.archivee %}opacity-50{% endif %}">
+            <td class="py-3 px-4">Du {{ a.date_debut.strftime("%d/%m/%Y") if a.date_debut else "—" }} au {{ a.date_fin.strftime("%d/%m/%Y") if a.date_fin else "—" }}</td>
+            <td class="py-3 px-4"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-secondary-fixed text-on-secondary-fixed font-medium">{{ a.type_absence.libelle if a.type_absence else "—" }}</span></td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ a.motif or "—" }}</td>
+            <td class="py-3 px-4 text-center">{{ duree_absence(a) }}j</td>
+            <td class="py-3 px-4 text-center">
+              {% if a.justifiee %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#c6f6d5] text-[#276749] font-medium">Justifiée</span>
+              {% else %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">Non justifiée</span>{% endif %}
+            </td>
+            <td class="py-3 px-4 text-center font-semibold">{{ a.jours_deduits_conges or 0 }}j</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Sanctions -->
+  {% if mes_sanctions %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4">
+      <span class="text-[15px] font-semibold text-on-surface">Mes sanctions disciplinaires</span>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-semibold ml-2">{{ mes_sanctions|length }}</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-[13px]">
+        <thead class="bg-surface-container-low uppercase text-on-surface-variant text-[11px] tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Date</th>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Motif</th>
+            <th class="py-3 px-4">Durée</th>
+          </tr>
+        </thead>
+        <tbody class="text-on-surface">
+          {% for s in mes_sanctions %}
+          <tr class="border-t border-surface-container-high">
+            <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap">{{ s.date_sanction.strftime("%d/%m/%Y") if s.date_sanction else "—" }}</td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-[#fed7d7] text-[#9b2c2c] font-medium">{{ s.type_sanction }}</span>
+            </td>
+            <td class="py-3 px-4">
+              {{ s.motif or "—" }}
+              {% if s.commentaire %}
+              <div class="text-[11px] text-on-surface-variant mt-1 italic">{{ s.commentaire }}</div>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ s.duree or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

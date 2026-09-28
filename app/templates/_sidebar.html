@@ -1,0 +1,151 @@
+<aside class="fixed left-0 top-0 h-full w-[240px] z-40 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.08)] bg-gradient-to-b from-[#06547A] to-[#2F7592] text-white">
+  <div class="flex flex-col">
+    <div class="h-[58px] px-4 flex items-center gap-2 bg-black/10">
+      <div class="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
+        <span class="material-symbols-outlined text-[18px] text-white">account_balance</span>
+      </div>
+      <div class="flex flex-col">
+        <span class="text-[15px] font-bold text-white leading-none tracking-tight">PASL-RH</span>
+        <span class="text-[11px] text-white/70 uppercase tracking-wider leading-none mt-1">Panafrican SL</span>
+      </div>
+    </div>
+
+    <!-- Bouton Nouvelle demande : visible pour tous SAUF Comité et Administrateur -->
+    {% if request.session.get('role') not in ['Comité de direction', 'Administrateur'] %}
+    <div class="px-4 pt-4 pb-2">
+      <a href="/demandes/nouvelle" class="w-full flex items-center justify-center gap-2 h-[38px] bg-white text-primary hover:bg-surface-container-low transition-colors rounded-lg text-[13px] font-semibold shadow-sm">
+        <span class="material-symbols-outlined text-[18px]">add</span>
+        <span>Nouvelle demande</span>
+      </a>
+    </div>
+    {% endif %}
+
+    <nav class="flex flex-col gap-0.5 px-2 mt-2">
+      {% set role = request.session.get('role') %}
+
+      {# =============================== #}
+      {# EMPLOYÉ : uniquement son espace #}
+      {# =============================== #}
+      {% if role == 'Employé' %}
+      <div class="px-3 py-1 text-[11px] text-white/60 uppercase tracking-wider">Mon espace</div>
+      <a href="/espace" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/espace') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">person</span>
+        <span>Mon espace</span>
+      </a>
+      <a href="/mes-validations" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/mes-validations') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">fact_check</span>
+        <span>Mes validations</span>
+      </a>
+
+      {# =============================== #}
+      {# ADMINISTRATEUR : dashboard + admin #}
+      {# =============================== #}
+      {% elif role == 'Administrateur' %}
+      <div class="px-3 py-1 text-[11px] text-white/60 uppercase tracking-wider">Principal</div>
+      <a href="/" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path == '/' else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">dashboard</span>
+        <span>Tableau de bord</span>
+      </a>
+
+      <div class="px-3 pt-4 pb-1 text-[11px] text-white/60 uppercase tracking-wider">Configuration</div>
+      <a href="/admin" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/admin') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">settings</span>
+        <span>Administration</span>
+      </a>
+      {# [LOT 1 - POINT 1] Journal d'audit #}
+      <a href="/admin/journal" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/admin/journal') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">history</span>
+        <span>Journal d'audit</span>
+      </a>
+
+      {# =============================== #}
+      {# COMITÉ DE DIRECTION : lecture seule #}
+      {# =============================== #}
+      {% elif role == 'Comité de direction' %}
+      <div class="px-3 py-1 text-[11px] text-white/60 uppercase tracking-wider">Principal</div>
+      <a href="/" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path == '/' else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">dashboard</span>
+        <span>Tableau de bord</span>
+      </a>
+      <a href="/employes" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/employes') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">group</span>
+        <span>Employés</span>
+      </a>
+      <a href="/absences" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/absences') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">event_busy</span>
+        <span>Suivi des absences</span>
+      </a>
+      <a href="/conges" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/conges') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">calendar_month</span>
+        <span>Congés &amp; Soldes</span>
+      </a>
+      {# [ÉTAPE 3] Décision des licenciements #}
+      {% set nb_lic = nb_licenciements_a_decider() %}
+      <a href="/licenciements" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/licenciements') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">gavel</span>
+        <span>Licenciements à décider</span>
+        {% if nb_lic %}<span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-[#fed7d7] text-[#9b2c2c] text-[11px] font-bold">{{ nb_lic }}</span>{% endif %}
+      </a>
+
+      {# =============================== #}
+      {# CHEF RH et ASSISTANT RH #}
+      {# =============================== #}
+      {% elif role in ['Chef RH', 'Assistant RH'] %}
+      <div class="px-3 py-1 text-[11px] text-white/60 uppercase tracking-wider">Principal</div>
+      <a href="/" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path == '/' else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">dashboard</span>
+        <span>Tableau de bord</span>
+      </a>
+      <a href="/employes" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/employes') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">group</span>
+        <span>Employés</span>
+      </a>
+      <a href="/demandes" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/demandes') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">assignment</span>
+        <span>Demandes à traiter</span>
+      </a>
+      <a href="/absences" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/absences') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">event_busy</span>
+        <span>Suivi des absences</span>
+      </a>
+      <a href="/conges" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/conges') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">calendar_month</span>
+        <span>Congés &amp; Soldes</span>
+      </a>
+      {# [ÉTAPE 3] Procédures de licenciement #}
+      <a href="/licenciements" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/licenciements') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">gavel</span>
+        <span>Licenciements</span>
+      </a>
+      {% if role == 'Chef RH' %}
+      {# [LOT 1 - POINT 1] Journal d'audit (Chef RH) #}
+      <a href="/admin/journal" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/admin/journal') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">history</span>
+        <span>Journal d'audit</span>
+      </a>
+      {% endif %}
+      {% endif %}
+    </nav>
+  </div>
+
+  <div class="p-3 bg-black/15 flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2 overflow-hidden">
+      <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 text-white font-bold text-[13px]">
+        {{ request.session.get('nom', '?')[0] | upper }}
+      </div>
+      <div class="flex flex-col truncate">
+        <span class="text-[13px] font-medium text-white truncate">{{ request.session.get('nom', '') }}</span>
+        <span class="text-[11px] text-white/70 truncate">{{ request.session.get('role', '') }}</span>
+      </div>
+    </div>
+    {# [LOT 1 - POINT 3] Changer mon mot de passe (tous les rôles) #}
+    <div class="flex items-center gap-1 flex-shrink-0">
+    <a href="/mon-compte/mot-de-passe" class="text-white/70 hover:text-white p-1 rounded hover:bg-white/10 transition-colors flex items-center justify-center" title="Changer mon mot de passe">
+      <span class="material-symbols-outlined text-[20px]">key</span>
+    </a>
+    <a href="/logout" class="text-white/70 hover:text-white p-1 rounded hover:bg-white/10 transition-colors flex items-center justify-center" title="Déconnexion">
+      <span class="material-symbols-outlined text-[20px]">logout</span>
+    </a>
+    </div>
+  </div>
+</aside>

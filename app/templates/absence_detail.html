@@ -1,0 +1,236 @@
+{% extends "_layout.html" %}
+{% block breadcrumb %}Détail absence{% endblock %}
+{% block content %}
+
+<div class="flex flex-col gap-4 max-w-5xl">
+
+  <!-- Fil d'Ariane + Titre -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2 text-[13px]">
+      <a href="/absences" class="text-primary hover:underline font-medium flex items-center gap-1">
+        <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+        Retour aux absences
+      </a>
+    </div>
+    <div class="flex items-center gap-2">
+      {% if absence.justifiee %}
+      <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] bg-[#c6f6d5] text-[#276749] font-semibold">
+        <span class="material-symbols-outlined text-[14px]">check_circle</span>
+        Justifiée
+      </span>
+      {% else %}
+      <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] bg-[#fed7d7] text-[#9b2c2c] font-semibold">
+        <span class="material-symbols-outlined text-[14px]">cancel</span>
+        Non justifiée
+      </span>
+      {% endif %}
+      {% if absence.archivee %}
+      <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] bg-surface-container-high text-on-surface-variant font-semibold">
+        <span class="material-symbols-outlined text-[14px]">archive</span>
+        Archivée
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Messages -->
+  {% if request.query_params.get('ok') %}
+  <div class="px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px]">{{ request.query_params.get('ok') }}</div>
+  {% endif %}
+  {% if request.query_params.get('erreur') %}
+  <div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ request.query_params.get('erreur') }}</div>
+  {% endif %}
+
+  <!-- Titre -->
+  <div>
+    <h1 class="text-[22px] font-semibold text-on-surface">Absence #{{ absence.id }}</h1>
+    <p class="text-[13px] text-on-surface-variant mt-0.5">Détails de l'absence enregistrée pour {{ absence.employe.nom }} {{ absence.employe.prenom }}</p>
+  </div>
+
+  <!-- Carte 1 : Employé + Absence côte à côte -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+    <!-- Employé -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+      <div class="flex items-center gap-2 mb-4 pb-3 border-b border-surface-container-high">
+        <span class="material-symbols-outlined text-primary text-[20px]">person</span>
+        <h2 class="text-[15px] font-semibold text-on-surface">Employé</h2>
+      </div>
+      <div class="flex flex-col gap-3">
+        <div>
+          <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Nom complet</div>
+          <div class="text-[14px] text-on-surface font-medium mt-0.5">{{ absence.employe.nom }} {{ absence.employe.prenom }}</div>
+        </div>
+        <div>
+          <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Matricule</div>
+          <div class="text-[14px] text-on-surface mt-0.5">{{ absence.employe.matricule or "—" }}</div>
+        </div>
+        <div>
+          <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Poste</div>
+          <div class="text-[14px] text-on-surface mt-0.5">{{ absence.employe.poste.intitule if absence.employe.poste else "—" }}</div>
+        </div>
+        <div>
+          <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Département</div>
+          <div class="text-[14px] text-on-surface mt-0.5">{{ absence.employe.departement.nom if absence.employe.departement else "—" }}</div>
+        </div>
+        <div>
+          <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Agence</div>
+          <div class="text-[14px] text-on-surface mt-0.5">{{ absence.employe.agence.nom if absence.employe.agence else "Direction Générale" }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Absence -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+      <div class="flex items-center gap-2 mb-4 pb-3 border-b border-surface-container-high">
+        <span class="material-symbols-outlined text-primary text-[20px]">event_busy</span>
+        <h2 class="text-[15px] font-semibold text-on-surface">Absence</h2>
+      </div>
+      <div class="flex flex-col gap-3">
+        <div>
+          <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Type</div>
+          <div class="text-[14px] text-on-surface font-medium mt-0.5">{{ absence.type_absence.libelle if absence.type_absence else "—" }}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Du</div>
+            <div class="text-[14px] text-on-surface mt-0.5">{{ absence.date_debut.strftime("%d/%m/%Y") if absence.date_debut else "—" }}</div>
+          </div>
+          <div>
+            <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Au</div>
+            <div class="text-[14px] text-on-surface mt-0.5">{{ absence.date_fin.strftime("%d/%m/%Y") if absence.date_fin else "—" }}</div>
+          </div>
+        </div>
+        <div>
+          <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Durée</div>
+          <div class="text-[14px] text-on-surface font-semibold mt-0.5">
+            {{ duree_absence(absence) }} jour(s){% if absence.type_absence and absence.type_absence.code == "CA" %} ouvrable(s){% endif %}
+          </div>
+        </div>
+        {% if absence.motif %}
+        <div>
+          <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Motif</div>
+          <div class="text-[13px] text-on-surface mt-0.5 italic">"{{ absence.motif }}"</div>
+        </div>
+        {% endif %}
+        {% if absence.jours_deduits_conges %}
+        <div>
+          <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Jours déduits du congé</div>
+          <div class="text-[14px] text-[#975a16] font-semibold mt-0.5">{{ absence.jours_deduits_conges }} jour(s)</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Carte 2 : Justificatif -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+    <div class="flex items-center gap-2 mb-4 pb-3 border-b border-surface-container-high">
+      <span class="material-symbols-outlined text-primary text-[20px]">attach_file</span>
+      <h2 class="text-[15px] font-semibold text-on-surface">Justificatif</h2>
+    </div>
+    {% if absence.justificatif_path %}
+    <div class="flex items-center justify-between p-3 bg-[#F0FDF4] rounded-lg">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-[#166534]">description</span>
+        <span class="text-[13px] text-[#166534] font-medium">Un justificatif est enregistré</span>
+      </div>
+      <a href="/{{ absence.justificatif_path }}" target="_blank" class="inline-flex items-center gap-1 text-[13px] text-primary hover:underline font-semibold">
+        <span class="material-symbols-outlined text-[16px]">visibility</span>
+        Voir le justificatif
+      </a>
+    </div>
+    {% else %}
+    <div class="flex items-center justify-between p-3 bg-surface-container-low rounded-lg">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-on-surface-variant">description_off</span>
+        <span class="text-[13px] text-on-surface-variant">Aucun justificatif n'a été fourni</span>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if role in ["Chef RH", "Assistant RH"] %}
+    <form method="post" action="/absences/{{ absence.id }}/justificatif" enctype="multipart/form-data" class="mt-4 flex items-center gap-3">
+      {{ csrf_input(request) }}
+      <input type="file" name="fichier" required class="flex-1 text-[13px] text-on-surface-variant file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20">
+      <button type="submit" class="inline-flex items-center gap-1.5 h-[38px] px-4 rounded-lg bg-primary-container text-white text-[13px] font-semibold hover:opacity-95 transition-all">
+        <span class="material-symbols-outlined text-[18px]">upload</span>
+        <span>Uploader</span>
+      </button>
+    </form>
+    <p class="text-[12px] text-on-surface-variant mt-2">Formats acceptés : image ou PDF.</p>
+    {% endif %}
+  </div>
+
+  <!-- Carte 3 : Métadonnées -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+    <div class="flex items-center gap-2 mb-4 pb-3 border-b border-surface-container-high">
+      <span class="material-symbols-outlined text-primary text-[20px]">info</span>
+      <h2 class="text-[15px] font-semibold text-on-surface">Informations administratives</h2>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Enregistré par</div>
+        <div class="text-[14px] text-on-surface mt-0.5">{{ absence.enregistre_par or "—" }}</div>
+      </div>
+      <div>
+        <div class="text-[11px] text-on-surface-variant uppercase font-semibold tracking-wider">Date d'enregistrement</div>
+        <div class="text-[14px] text-on-surface mt-0.5">{{ absence.date_enregistrement.strftime("%d/%m/%Y") if absence.date_enregistrement else "—" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Carte 4 : Actions -->
+  {% if role in ["Chef RH", "Assistant RH"] %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+    <div class="flex items-center gap-2 mb-4 pb-3 border-b border-surface-container-high">
+      <span class="material-symbols-outlined text-primary text-[20px]">settings</span>
+      <h2 class="text-[15px] font-semibold text-on-surface">Actions</h2>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+
+      <!-- Justifier / Déjustifier -->
+      <form method="post" action="/absences/{{ absence.id }}/justifier" style="margin:0;">
+        {{ csrf_input(request) }}
+        {% if absence.justifiee %}
+        <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-[#fed7d7] text-[#9b2c2c] text-[13px] font-semibold hover:bg-[#fbb] transition-colors">
+          <span class="material-symbols-outlined text-[18px]">cancel</span>
+          <span>Déjustifier</span>
+        </button>
+        {% else %}
+        <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-[#c6f6d5] text-[#276749] text-[13px] font-semibold hover:bg-[#a7f3d0] transition-colors"
+                {% if role == "Assistant RH" and not absence.justificatif_path %}title="Vous devez d'abord uploader un justificatif"{% endif %}>
+          <span class="material-symbols-outlined text-[18px]">check_circle</span>
+          <span>Justifier</span>
+        </button>
+        {% endif %}
+      </form>
+
+      <!-- Archiver / Désarchiver -->
+      <form method="post" action="/absences/{{ absence.id }}/archiver" style="margin:0;">
+        {{ csrf_input(request) }}
+        {% if absence.archivee %}
+        <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold hover:bg-surface-container-highest transition-colors">
+          <span class="material-symbols-outlined text-[18px]">unarchive</span>
+          <span>Réactiver</span>
+        </button>
+        {% else %}
+        <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold hover:bg-surface-container-highest transition-colors">
+          <span class="material-symbols-outlined text-[18px]">archive</span>
+          <span>Archiver</span>
+        </button>
+        {% endif %}
+      </form>
+    </div>
+
+    {% if role == "Assistant RH" and not absence.justifiee and not absence.justificatif_path %}
+    <p class="text-[12px] text-[#975a16] mt-3 flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-[16px]">info</span>
+      En tant qu'Assistant RH, vous devez uploader un justificatif avant de pouvoir marquer cette absence comme justifiée.
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

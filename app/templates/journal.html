@@ -1,0 +1,95 @@
+{% extends "_layout.html" %}
+{% block title %}Journal d'audit{% endblock %}
+{% block breadcrumb %}Journal d'audit{% endblock %}
+{% block content %}
+{# [LOT 1 - POINT 1] Journal d'audit : consultation seule (Administrateur, Chef RH) #}
+<div class="page-header">
+  <div>
+    <div class="page-title">Journal d'audit</div>
+    <div class="page-subtitle">Qui a fait quoi, quand, et avec quelles valeurs. Ce journal ne peut être ni modifié ni supprimé depuis l'application.</div>
+  </div>
+</div>
+
+<div class="card" style="padding:18px;margin-bottom:18px;">
+  <form method="get" action="/admin/journal" class="form-grid" style="grid-template-columns:repeat(6, minmax(0,1fr));gap:12px;align-items:end;">
+    <div><label class="form-label">Du</label><input type="date" name="date_debut" value="{{ filtres.date_debut }}" class="form-control"></div>
+    <div><label class="form-label">Au</label><input type="date" name="date_fin" value="{{ filtres.date_fin }}" class="form-control"></div>
+    <div><label class="form-label">Utilisateur</label><input type="text" name="utilisateur" value="{{ filtres.utilisateur }}" class="form-control" placeholder="Nom"></div>
+    <div><label class="form-label">Employé concerné</label><input type="text" name="employe" value="{{ filtres.employe }}" class="form-control" placeholder="Nom ou matricule"></div>
+    <div>
+      <label class="form-label">Objet</label>
+      <select name="objet_type" class="form-control">
+        <option value="">Tous</option>
+        {% for t in types_objets %}<option value="{{ t }}" {% if filtres.objet_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label">Action</label>
+      <select name="action" class="form-control">
+        <option value="">Toutes</option>
+        {% for cle, lib in actions.items() %}<option value="{{ cle }}" {% if filtres.action == cle %}selected{% endif %}>{{ lib }}</option>{% endfor %}
+      </select>
+    </div>
+    <div style="grid-column:span 6;display:flex;gap:8px;">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filtrer</button>
+      <a href="/admin/journal" class="btn btn-outline">Réinitialiser</a>
+      <span class="text-muted" style="margin-left:auto;align-self:center;font-size:13px;">{{ total }} entrée(s)</span>
+    </div>
+  </form>
+</div>
+
+<div class="card table-wrapper">
+  <table>
+    <thead>
+      <tr><th style="width:140px;">Date</th><th>Utilisateur</th><th>Action</th><th>Objet</th><th>Détail</th></tr>
+    </thead>
+    <tbody>
+      {% for l in lignes %}
+      <tr>
+        <td style="white-space:nowrap;font-size:12.5px;">{{ l.date_heure.strftime("%d/%m/%Y %H:%M:%S") }}</td>
+        <td style="font-size:13px;">
+          {{ l.utilisateur_nom or "—" }}
+          {% if l.role %}<div class="text-muted" style="font-size:11.5px;">{{ l.role }}</div>{% endif %}
+          {% if l.adresse_ip %}<div class="text-muted" style="font-size:11px;">{{ l.adresse_ip }}</div>{% endif %}
+        </td>
+        <td style="font-size:13px;white-space:nowrap;">
+          {% set couleur = {"creation": "#276749", "modification": "#2b6cb0", "suppression": "#9b2c2c", "echec_connexion": "#9b2c2c"}.get(l.action, "#4a5568") %}
+          <span style="color:{{ couleur }};font-weight:600;">{{ actions.get(l.action, l.action) }}</span>
+        </td>
+        <td style="font-size:13px;">
+          {{ l.objet_type }}{% if l.objet_id %} n°{{ l.objet_id }}{% endif %}
+          {% if l.employe_id %}
+          <div style="font-size:12px;"><a href="/employes/{{ l.employe_id }}">{{ noms_employes.get(l.employe_id, "Employé n°" ~ l.employe_id) }}</a></div>
+          {% endif %}
+        </td>
+        <td style="font-size:12.5px;">
+          {% if l.description %}<div>{{ l.description }}</div>{% endif %}
+          {% if l.details %}
+          <ul style="margin:0;padding-left:16px;">
+            {% for colonne, valeurs in l.details.items() %}
+            <li>
+              <span style="color:var(--muted);">{{ libelles.get(colonne, colonne) }} :</span>
+              {% if l.action == "creation" %}{{ valeurs[1] }}
+              {% elif l.action == "suppression" %}{{ valeurs[0] }}
+              {% else %}<span style="text-decoration:line-through;color:#9b2c2c;">{{ valeurs[0] if valeurs[0] is not none else "vide" }}</span> → <span style="color:#276749;">{{ valeurs[1] if valeurs[1] is not none else "vide" }}</span>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">Aucune entrée pour ces critères.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if nb_pages > 1 %}
+<div style="display:flex;gap:8px;justify-content:center;margin-top:14px;font-size:13px;">
+  {% if page > 1 %}<a class="btn btn-outline btn-sm" href="/admin/journal?page={{ page - 1 }}&{{ requete_filtres }}">← Précédent</a>{% endif %}
+  <span style="align-self:center;">Page {{ page }} / {{ nb_pages }}</span>
+  {% if page < nb_pages %}<a class="btn btn-outline btn-sm" href="/admin/journal?page={{ page + 1 }}&{{ requete_filtres }}">Suivant →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

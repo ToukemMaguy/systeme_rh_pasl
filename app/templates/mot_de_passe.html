@@ -1,0 +1,58 @@
+{% extends "_layout.html" %}
+{% block title %}Mon mot de passe{% endblock %}
+{% block breadcrumb %}Mon mot de passe{% endblock %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-xl">
+
+  <div>
+    <h1 class="text-[22px] font-semibold text-on-surface">Changer mon mot de passe</h1>
+    <p class="text-[13px] text-on-surface-variant mt-0.5">
+      {{ longueur_min }} caractères minimum, avec au moins une lettre et un chiffre.
+    </p>
+  </div>
+
+  {% if obligatoire and not succes %}
+  <div class="px-4 py-2.5 rounded-lg bg-[#EBF4FF] text-[#2B6CB0] text-[13px] flex items-start gap-2">
+    <span class="material-symbols-outlined text-[18px]">info</span>
+    <span>Votre mot de passe actuel a été attribué par l'administrateur. Nous vous conseillons de le remplacer par un mot de passe personnel.</span>
+  </div>
+  {% endif %}
+  {% if succes %}
+  <div class="px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px]">
+    {{ succes }} <a href="{{ accueil }}" class="font-semibold underline ml-1">Continuer</a>
+  </div>
+  {% endif %}
+  {% if erreur %}
+  <div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ erreur }}</div>
+  {% endif %}
+
+  {% if not succes %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5">
+    <form method="post" action="/mon-compte/mot-de-passe" class="flex flex-col gap-4">
+      {{ csrf_input(request) }}
+      <div>
+        <label class="block text-[12px] text-on-surface-variant font-medium mb-1" for="actuel">Mot de passe actuel</label>
+        <input id="actuel" type="password" name="mot_de_passe_actuel" required autocomplete="current-password"
+               class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20">
+      </div>
+      <div>
+        <label class="block text-[12px] text-on-surface-variant font-medium mb-1" for="nouveau">Nouveau mot de passe</label>
+        <input id="nouveau" type="password" name="nouveau_mot_de_passe" required minlength="{{ longueur_min }}" autocomplete="new-password"
+               class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20">
+      </div>
+      <div>
+        <label class="block text-[12px] text-on-surface-variant font-medium mb-1" for="confirmation">Confirmer le nouveau mot de passe</label>
+        <input id="confirmation" type="password" name="confirmation" required minlength="{{ longueur_min }}" autocomplete="new-password"
+               class="w-full h-[38px] px-3 bg-surface-container-low rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20">
+      </div>
+      <div class="flex items-center gap-3">
+        <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-primary-container text-white text-[13px] font-semibold hover:opacity-95 transition-all">
+          <span class="material-symbols-outlined text-[18px]">key</span>
+          Enregistrer
+        </button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

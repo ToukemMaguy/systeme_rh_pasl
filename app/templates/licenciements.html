@@ -1,0 +1,48 @@
+{% extends "_layout.html" %}
+{% block title %}Licenciements{% endblock %}
+{% block breadcrumb %}{{ "Licenciements à décider" if est_comite else "Procédures de licenciement" }}{% endblock %}
+{% block content %}
+{# [ÉTAPE 3] Liste des dossiers de licenciement (RH : tous ; Comité : dossiers transmis) #}
+<div class="flex flex-col gap-4">
+
+  <div>
+    <h1 class="text-[22px] font-semibold text-on-surface">{{ "Licenciements à décider" if est_comite else "Procédures de licenciement" }}</h1>
+    <p class="text-[13px] text-on-surface-variant mt-0.5">
+      {% if est_comite %}Dossiers transmis par la RH après le conseil de discipline.
+      {% else %}Pour ouvrir une procédure : fiche de l'employé → « Engager une procédure de licenciement ».{% endif %}
+    </p>
+  </div>
+
+  <div class="flex flex-wrap gap-2 text-[12.5px]">
+    {% set filtres = ([("transmis", "En attente de décision"), ("approuve", "Approuvés"), ("notifie", "Notifiés"), ("rejete", "Rejetés"), ("complement", "Complément demandé"), ("tous", "Tous")] if est_comite
+       else [("", "Tous"), ("ouvert", "En instruction"), ("complement", "Complément demandé"), ("transmis", "Chez le Comité"), ("approuve", "À notifier"), ("notifie", "Notifiés"), ("rejete", "Rejetés"), ("clos_sanction", "Clos — sanction"), ("annule", "Annulés")]) %}
+    {% for cle, lib in filtres %}
+    <a href="/licenciements?statut={{ cle }}" class="px-3 h-8 inline-flex items-center rounded-full {{ 'bg-primary-container text-white' if statut == cle else 'bg-surface-container-high text-on-surface' }}">{{ lib }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <table class="w-full text-[13px]">
+      <thead class="bg-surface-container-low text-on-surface-variant text-[11.5px] uppercase">
+        <tr><th class="py-3 px-4 text-left">N°</th><th class="py-3 px-4 text-left">Employé</th><th class="py-3 px-4 text-left">Motif</th>
+            <th class="py-3 px-4 text-left">Statut</th><th class="py-3 px-4 text-left">Ouvert le</th><th class="py-3 px-4"></th></tr>
+      </thead>
+      <tbody>
+        {% for d in dossiers %}
+        <tr class="border-t border-surface-container-high">
+          <td class="py-3 px-4 text-on-surface-variant">{{ d.id }}</td>
+          <td class="py-3 px-4 font-medium">{{ d.employe.nom }} {{ d.employe.prenom }}
+            <div class="text-[11.5px] text-on-surface-variant">{{ d.employe.poste.intitule if d.employe.poste else "" }}</div></td>
+          <td class="py-3 px-4">{{ d.type_motif }}</td>
+          <td class="py-3 px-4"><span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium {{ statuts[d.statut][1] }}">{{ statuts[d.statut][0] }}</span></td>
+          <td class="py-3 px-4 text-on-surface-variant">{{ d.ouvert_le.strftime("%d/%m/%Y") if d.ouvert_le else "—" }}</td>
+          <td class="py-3 px-4 text-right"><a href="/licenciements/{{ d.id }}" class="text-primary font-semibold hover:underline">Ouvrir →</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="py-8 text-center text-on-surface-variant">Aucun dossier.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
