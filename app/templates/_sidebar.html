@@ -1,5 +1,6 @@
-<aside class="fixed left-0 top-0 h-full w-[240px] z-40 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.08)] bg-gradient-to-b from-[#06547A] to-[#2F7592] text-white">
-  <div class="flex flex-col">
+<aside class="fixed left-0 top-0 h-full w-[240px] z-40 flex flex-col shadow-[0_1px_8px_rgba(0,0,0,0.08)] bg-gradient-to-b from-[#06547A] to-[#2F7592] text-white">
+  {# Le menu défile quand il est plus haut que l'écran : le pied (mot de passe, déconnexion) reste toujours visible #}
+  <div class="flex flex-col flex-1 min-h-0">
     <!-- Étape 6 : logo officiel PASL (fond blanc, car le logo JPG n'est pas transparent) -->
     <a href="{{ '/espace' if request.session.get('role') == 'Employé' else '/' }}" class="h-[58px] px-3 flex items-center gap-2.5 bg-black/10" title="Accueil">
       <div class="bg-white rounded-md px-1.5 py-1 flex-shrink-0 shadow-sm">
@@ -18,7 +19,7 @@
     </div>
     {% endif %}
 
-    <nav class="flex flex-col gap-0.5 px-2 mt-2">
+    <nav class="menu-lateral flex flex-col gap-0.5 px-2 mt-2 pb-2 flex-1 min-h-0 overflow-y-auto">
       {% set role = request.session.get('role') %}
 
       {# =============================== #}
@@ -88,6 +89,10 @@
         <span class="material-symbols-outlined text-[20px]">view_timeline</span>
         <span>Calendrier d'équipe</span>
       </a>
+      <a href="/personnel-mad" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/personnel-mad') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">badge</span>
+        <span>Mis à disposition</span>
+      </a>
       {# [ÉTAPE 3] Décision des licenciements #}
       {% set nb_lic = nb_licenciements_a_decider() %}
       <a href="/licenciements" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/licenciements') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
@@ -125,6 +130,14 @@
         <span class="material-symbols-outlined text-[20px]">view_timeline</span>
         <span>Calendrier d'équipe</span>
       </a>
+      <a href="/personnel-mad" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/personnel-mad') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">badge</span>
+        <span>Mis à disposition</span>
+      </a>
+      <a href="/fichier-rh" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/fichier-rh') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">upload_file</span>
+        <span>Mise à jour depuis le fichier RH</span>
+      </a>
       {# [ÉTAPE 3] Procédures de licenciement #}
       <a href="/licenciements" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/licenciements') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
         <span class="material-symbols-outlined text-[20px]">gavel</span>
@@ -141,7 +154,7 @@
     </nav>
   </div>
 
-  <div class="p-3 bg-black/15 flex items-center justify-between gap-2">
+  <div class="p-3 bg-black/15 flex items-center justify-between gap-2 flex-shrink-0">
     <div class="flex items-center gap-2 overflow-hidden">
       <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 text-white font-bold text-[13px]">
         {{ request.session.get('nom', '?')[0] | upper }}

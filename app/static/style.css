@@ -287,3 +287,7 @@ select.form-control {
   .sidebar.open { transform: translateX(0); }
   .main-content { margin-left: 0; }
 }
+/* Menu latéral : barre de défilement discrète (le menu défile si l'écran est trop petit) */
+.menu-lateral { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.35) transparent; }
+.menu-lateral::-webkit-scrollbar { width: 6px; }
+.menu-lateral::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.35); border-radius: 3px; }
