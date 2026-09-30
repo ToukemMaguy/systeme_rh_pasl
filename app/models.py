@@ -316,6 +316,8 @@ class Licenciement(Base):
     date_sortie = Column(Date, nullable=True)
     jours_conges_restants = Column(Numeric(5, 1), nullable=True)   # figé au moment de la notification
     lettre_signee_path = Column(String(255), nullable=True)
+    # Texte de la lettre, rédigé librement par la RH (pas de modèle imposé) et imprimé sur le papier à en-tête PASL
+    lettre_texte = Column(Text, nullable=True)
     motif_annulation = Column(Text, nullable=True)
     depart_id = Column(Integer, ForeignKey("departs.id"), nullable=True)
     sanction_id = Column(Integer, ForeignKey("sanctions.id"), nullable=True)

@@ -437,7 +437,17 @@ db.expire_all()
 check("Comité : licenciement approuvé", db.get(models.Licenciement, DOS).statut == "approuve")
 check("Approuvé mais pas encore notifié → employé toujours actif", db.get(models.Employe, LIC_EMP).statut == "actif")
 r = rh.get(f"/licenciements/{DOS}/pdf/lettre")
-check("Lettre de licenciement PDF", r.status_code == 200 and r.headers["content-type"] == "application/pdf", f"HTTP {r.status_code}")
+check("Lettre : PDF refusé tant que le texte n'est pas rédigé", r.status_code in (302, 303, 307))
+TEXTE_LETTRE = "Douala, le 30/09/2026\n\nMonsieur <b>ESSOMBA</b> & Cie\nMatricule 123\n\nObjet : notification\n  \nMonsieur,\nNous vous informons..."
+rh.post(f"/licenciements/{DOS}/lettre", data={"lettre_texte": TEXTE_LETTRE})
+db.expire_all()
+check("Lettre : texte libre enregistré tel quel", db.get(models.Licenciement, DOS).lettre_texte == TEXTE_LETTRE)
+check("Lettre : zone de saisie affichée pour la RH", "lettre_texte" in rh.get(f"/licenciements/{DOS}").text)
+check("Lettre : Comité ne peut pas rédiger", comite.post(f"/licenciements/{DOS}/lettre", data={"lettre_texte": "x"}).status_code in (302, 303, 307)
+      and db.get(models.Licenciement, DOS).lettre_texte == TEXTE_LETTRE)
+r = rh.get(f"/licenciements/{DOS}/pdf/lettre")
+check("Lettre de licenciement PDF (texte avec < et &)", r.status_code == 200 and r.headers["content-type"] == "application/pdf", f"HTTP {r.status_code}")
+open("_lettre_test.pdf", "wb").write(r.content) if os.environ.get("GARDER_PDF") else None
 r = rh.post(f"/licenciements/{DOS}/notifier", data={"date_notification": date.today().isoformat(), "date_sortie": date.today().isoformat(),
             "mode_notification": "Remise en main propre contre décharge"})
 db.expire_all()
@@ -446,6 +456,9 @@ check("Notification enregistrée → sortie des effectifs le jour même", d.stat
 check("Départ enregistré avec le type de licenciement", db.query(models.Depart).filter_by(employe_id=LIC_EMP).first().type_depart == "Licenciement (Faute grave)")
 check("Accès de l'employé licencié coupés", not db.query(models.Utilisateur).filter_by(email="eric@t.cm").first().compte_actif)
 check("Jours de congés restants figés pour la paie", d.jours_conges_restants is not None)
+rh.post(f"/licenciements/{DOS}/lettre", data={"lettre_texte": "modifié après coup"})
+db.expire_all()
+check("Lettre figée après la notification", db.get(models.Licenciement, DOS).lettre_texte == TEXTE_LETTRE)
 check("Demandes en attente de l'employé annulées", db.get(models.DemandeRh, dem_eric).statut == "annulee")
 check("Alerte RH : N+1 à réaffecter", db.query(models.MailAEnvoyer).filter_by(type_mail="n_plus_1_a_reaffecter").count() >= 1)
 

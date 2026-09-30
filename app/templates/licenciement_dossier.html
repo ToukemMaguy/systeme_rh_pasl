@@ -218,10 +218,28 @@
   {% if est_rh and d.statut == "approuve" %}
   <div class="{{ carte }} border-2 border-[#38a169]">
     <div class="{{ titre }}">5. Notification à l'employé</div>
-    <p class="text-[13px] mb-3">1) Téléchargez la lettre, faites-la signer par la Direction et remettez-la à l'employé.
-      2) Renseignez ci-dessous la date de notification et la date de sortie des effectifs.</p>
-    <a href="/licenciements/{{ d.id }}/pdf/lettre" target="_blank" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold mb-4">
-      <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span> Télécharger la lettre de licenciement</a>
+    <p class="text-[13px] mb-3">1) Rédigez la lettre ci-dessous et téléchargez-la : elle est imprimée sur le papier à en-tête PASL.
+      2) Faites-la signer par la Direction et remettez-la à l'employé.
+      3) Renseignez ensuite la date de notification et la date de sortie des effectifs.</p>
+
+    {# Lettre en saisie libre : pas de modèle imposé (décision PASL), le texte est reproduit tel quel #}
+    <form method="post" action="/licenciements/{{ d.id }}/lettre" class="mb-5">
+      {{ csrf_input(request) }}
+      <label class="block text-[12px] text-on-surface-variant font-medium mb-1" for="lettre_texte">Texte de la lettre</label>
+      <textarea id="lettre_texte" name="lettre_texte" rows="16" class="w-full px-3 py-2 bg-surface-container-low rounded-lg text-[13px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="Saisissez la lettre complète : lieu et date, destinataire, objet, corps du texte, formule de politesse et signataire.&#10;&#10;Laissez une ligne vide entre deux paragraphes.">{{ d.lettre_texte or "" }}</textarea>
+      <div class="text-[11.5px] text-on-surface-variant mt-1">Le logo et les coordonnées de la PASL sont ajoutés automatiquement (en-tête et pied de page). Le texte reste modifiable jusqu'à la notification.</div>
+      <div class="flex flex-wrap items-center gap-3 mt-3">
+        <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-primary-container text-white text-[13px] font-semibold">
+          <span class="material-symbols-outlined text-[18px]">save</span> Enregistrer le texte</button>
+        {% if d.lettre_texte %}
+        <a href="/licenciements/{{ d.id }}/pdf/lettre" target="_blank" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold">
+          <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span> Télécharger la lettre (PDF)</a>
+        {% else %}
+        <span class="text-[12px] text-on-surface-variant">Enregistrez le texte pour pouvoir télécharger le PDF.</span>
+        {% endif %}
+      </div>
+    </form>
     <form method="post" action="/licenciements/{{ d.id }}/notifier" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
       {{ csrf_input(request) }}
       <div><label class="block text-[12px] text-on-surface-variant font-medium mb-1">Date de notification *</label>
@@ -249,7 +267,7 @@
         {{ "effectuée (accès coupés)" if employe.statut != "actif" else "programmée" }}</div></div>
       <div><div class="{{ etiquette }}">Congés restants à la sortie (pour la paie)</div><div class="mt-1">{{ d.jours_conges_restants | fmt_nombre }} j</div></div>
       <div><div class="{{ etiquette }}">Documents</div><div class="mt-1 flex flex-col gap-1">
-        {% if est_rh %}<a href="/licenciements/{{ d.id }}/pdf/lettre" target="_blank" class="text-primary underline">Lettre de licenciement (PDF)</a>{% endif %}
+        {% if est_rh and d.lettre_texte %}<a href="/licenciements/{{ d.id }}/pdf/lettre" target="_blank" class="text-primary underline">Lettre de licenciement (PDF)</a>{% endif %}
         {% if d.lettre_signee_path %}<a href="/{{ d.lettre_signee_path }}" target="_blank" class="text-primary underline">Lettre signée</a>{% endif %}
         {% if est_rh and employe.statut != "actif" %}<a href="/employes/{{ employe.id }}/pdf/certificat" target="_blank" class="text-primary underline">Certificat de travail</a>{% endif %}
       </div></div>

@@ -1,14 +1,12 @@
 <aside class="fixed left-0 top-0 h-full w-[240px] z-40 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.08)] bg-gradient-to-b from-[#06547A] to-[#2F7592] text-white">
   <div class="flex flex-col">
-    <div class="h-[58px] px-4 flex items-center gap-2 bg-black/10">
-      <div class="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
-        <span class="material-symbols-outlined text-[18px] text-white">account_balance</span>
+    <!-- Étape 6 : logo officiel PASL (fond blanc, car le logo JPG n'est pas transparent) -->
+    <a href="{{ '/espace' if request.session.get('role') == 'Employé' else '/' }}" class="h-[58px] px-3 flex items-center gap-2.5 bg-black/10" title="Accueil">
+      <div class="bg-white rounded-md px-1.5 py-1 flex-shrink-0 shadow-sm">
+        <img src="/static/logo-pasl.jpg" alt="Pan-African Savings &amp; Loans" class="h-[34px] w-auto block">
       </div>
-      <div class="flex flex-col">
-        <span class="text-[15px] font-bold text-white leading-none tracking-tight">PASL-RH</span>
-        <span class="text-[11px] text-white/70 uppercase tracking-wider leading-none mt-1">Panafrican SL</span>
-      </div>
-    </div>
+      <span class="text-[12px] font-semibold text-white/90 uppercase tracking-wider leading-tight">Système<br>RH</span>
+    </a>
 
     <!-- Bouton Nouvelle demande : visible pour tous SAUF Comité et Administrateur -->
     {% if request.session.get('role') not in ['Comité de direction', 'Administrateur'] %}

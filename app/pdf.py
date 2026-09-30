@@ -3,6 +3,7 @@
 Utilise ReportLab (pur Python). Chaque fonction retourne les bytes du PDF,
 prêts à être envoyés via une Response FastAPI.
 """
+import re
 from io import BytesIO
 from datetime import date
 from pathlib import Path
@@ -624,8 +625,12 @@ def generer_attestation_travail_pdf(employe) -> bytes:
 # Lettre de licenciement (étape 3)
 # ------------------------------------------------------------------
 def generer_lettre_licenciement_pdf(employe, dossier) -> bytes:
-    """Lettre notifiant le licenciement, après approbation du Comité de direction.
-    Le texte est un modèle : il doit être relu et signé par la Direction avant remise."""
+    """Lettre de licenciement sur le papier à en-tête PASL (logo en haut, coordonnées en pied de page).
+
+    Décision PASL : pas de modèle imposé, car les formats varient selon les cas. Le texte est rédigé
+    librement par la RH dans le dossier (champ lettre_texte) et reproduit tel quel : lieu, date,
+    destinataire, objet, corps et formule de signature compris.
+    Mise en forme : une ligne vide sépare deux paragraphes ; un simple retour à la ligne est conservé."""
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
@@ -636,59 +641,13 @@ def generer_lettre_licenciement_pdf(employe, dossier) -> bytes:
     styles = _styles()
     elements = _entete_pasl(styles)
 
-    date_lettre = dossier.date_notification or date.today()
-    elements.append(ParagraphBalise(f"{_e(PASL_VILLE)}, le {date_lettre.strftime('%d/%m/%Y')}", styles["PaslCorps"]))
-    elements.append(Spacer(1, 4 * mm))
-    destinataire = (f"{_civilite(employe)} <b>{_e(employe.nom)} {_e(employe.prenom)}</b><br/>"
-                    f"Matricule : {_e(employe.matricule or '—')}<br/>"
-                    f"{_e(employe.poste.intitule if employe.poste else '')}")
-    elements.append(ParagraphBalise(destinataire, styles["PaslCorps"]))
-    elements.append(Spacer(1, 6 * mm))
-    elements.append(ParagraphBalise("<b>Objet : notification de licenciement</b>", styles["PaslCorps"]))
-    elements.append(Spacer(1, 4 * mm))
-
-    elements.append(Paragraph(f"{_civilite(employe)},", styles["PaslCorps"]))
-    conseil = (f" Votre situation a été examinée par le conseil de discipline réuni le "
-               f"{dossier.conseil_date.strftime('%d/%m/%Y')}." if dossier.conseil_date else "")
-    elements.append(ParagraphBalise(
-        f"Nous vous informons que la Direction de la <b>{_e(PASL_NOM)}</b> a décidé de mettre fin à votre contrat "
-        f"de travail pour le motif suivant : <b>{_e(dossier.type_motif.lower())}</b>.{_e(conseil)}",
-        styles["PaslCorps"]))
-    if dossier.expose_faits:
-        elements.append(ParagraphBalise(f"<b>Faits reprochés :</b> {_e(dossier.expose_faits)}", styles["PaslCorps"]))
-
-    if dossier.type_motif == "Faute lourde":
-        preavis = "Compte tenu de la gravité des faits (faute lourde), aucun préavis ne sera effectué."
-    elif dossier.preavis_dispense:
-        preavis = "Vous êtes dispensé(e) de l'exécution de votre préavis."
-    elif dossier.preavis_jours:
-        preavis = (f"Votre préavis, d'une durée de {dossier.preavis_jours} jours, court à compter de la "
-                   "notification de la présente lettre.")
-    else:
-        preavis = ""
-    if preavis:
-        elements.append(Paragraph(preavis, styles["PaslCorps"]))
-    if dossier.date_sortie:
-        elements.append(ParagraphBalise(
-            f"Vous cesserez de faire partie des effectifs de la société le "
-            f"<b>{dossier.date_sortie.strftime('%d/%m/%Y')}</b>.", styles["PaslCorps"]))
-    elements.append(Paragraph(
-        "Votre certificat de travail ainsi que votre solde de tout compte seront tenus à votre disposition "
-        "auprès du service des Ressources Humaines.", styles["PaslCorps"]))
-    elements.append(Paragraph(
-        f"Veuillez agréer, {_civilite(employe)}, l'expression de nos salutations distinguées.", styles["PaslCorps"]))
-    elements.append(Spacer(1, 14 * mm))
-
-    signature = [
-        [ParagraphBalise("<b>La Direction Générale</b>", styles["PaslCorps"])],
-        [Spacer(1, 18 * mm)],
-        [Paragraph("(Signature et cachet)", styles["PaslItalique"])],
-        [Spacer(1, 6 * mm)],
-        [Paragraph("Reçu le : ____ / ____ / ________   Signature de l'intéressé(e) :", styles["PaslCorps"])],
-    ]
-    table_sig = Table(signature, colWidths=[170 * mm])
-    table_sig.setStyle(TableStyle([("ALIGN", (0, 0), (-1, 2), "RIGHT")]))
-    elements.append(table_sig)
+    texte = (dossier.lettre_texte or "").replace("\r\n", "\n").strip()
+    for bloc in re.split(r"\n[ \t]*\n", texte):
+        bloc = bloc.strip("\n")
+        if not bloc.strip():
+            continue
+        # Texte saisi échappé (un « < » ou un « & » ne casse pas le PDF), puis retours à la ligne conservés
+        elements.append(ParagraphBalise(_e(bloc).replace("\n", "<br/>"), styles["PaslCorps"]))
 
     doc.build(elements, onFirstPage=_pied_de_page, onLaterPages=_pied_de_page)
     buffer.seek(0)

@@ -441,12 +441,32 @@ def notifier(
     return _retour(d.id, ok=message)
 
 
+@router.post("/licenciements/{dossier_id}/lettre")
+def enregistrer_lettre(
+    dossier_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    lettre_texte: str = Form(""),
+):
+    """Texte libre de la lettre (les formats varient selon les cas : pas de modèle imposé).
+    Modifiable tant que le licenciement n'est pas notifié ; ensuite, il est figé (c'est la lettre remise)."""
+    _exiger_rh_licenciement(request)
+    d = _dossier_ou_404(db, dossier_id, request)
+    if d.statut != "approuve":
+        return _retour(d.id, erreur="Le texte de la lettre n'est modifiable qu'entre l'approbation du Comité et la notification.")
+    d.lettre_texte = lettre_texte.strip() or None
+    db.commit()
+    return _retour(d.id, ok="Texte de la lettre enregistré. Vous pouvez télécharger le PDF sur papier à en-tête.")
+
+
 @router.get("/licenciements/{dossier_id}/pdf/lettre")
 def pdf_lettre(dossier_id: int, request: Request, db: Session = Depends(get_db)):
     _exiger_rh_licenciement(request)
     d = _dossier_ou_404(db, dossier_id, request)
     if d.statut not in ("approuve", "notifie"):
         return _retour(d.id, erreur="La lettre n'est disponible qu'après l'approbation du Comité.")
+    if not d.lettre_texte:
+        return _retour(d.id, erreur="Rédigez et enregistrez d'abord le texte de la lettre.")
     contenu = pdf_module.generer_lettre_licenciement_pdf(d.employe, d)
     nom = f"lettre_licenciement_{d.employe.matricule or d.employe.id}_{d.employe.nom}.pdf".replace(" ", "_")
     return Response(content=contenu, media_type="application/pdf",
