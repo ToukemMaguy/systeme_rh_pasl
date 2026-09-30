@@ -1,5 +1,5 @@
 """Employés : liste, création, modification, fiche, sanctions, documents PDF."""
-from datetime import date
+from datetime import date, timedelta
 from urllib.parse import quote
 from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.responses import RedirectResponse, Response
@@ -9,7 +9,7 @@ from ..database import get_db
 from .. import models
 from .. import pdf as pdf_module
 from ..outils import _date_ou_none, _email_valide, _enregistrer_fichier, _entier_ou_none, _exiger_chef_rh, _exiger_lecture, _exiger_non_employe, _exiger_rh, _valider_saisies_employe, templates
-from ..regles_rh import _age_annees, _anciennete, _employe_ou_404, _historique_employe, _solde_conges, _tranche_age, _valeurs_depuis_employe
+from ..regles_rh import AGE_RETRAITE, date_retraite, _age_annees, _anciennete, _employe_ou_404, _historique_employe, _solde_conges, _tranche_age, _valeurs_depuis_employe
 
 router = APIRouter()
 
@@ -267,30 +267,72 @@ def creer_employe(
     return RedirectResponse(url=f"/employes?ok={message}", status_code=303)
 @router.get("/employes/{employe_id}")
 def fiche_employe(employe_id: int, request: Request, onglet: str = "historique", db: Session = Depends(get_db)):
+    """[ÉTAPE 5] Fiche employé : en-tête, chiffres clés, alertes, informations et onglets.
+    Les onglets gardent leurs anciennes adresses (?onglet=conges, documents, disciplinaire) :
+    les liens existants depuis les autres pages continuent de fonctionner."""
     _exiger_lecture(request)
     employe = _employe_ou_404(db, employe_id)
-    historique = _historique_employe(db, employe_id)
+    aujourdhui = date.today()
+    est_rh = request.session.get("role") in ("Chef RH", "Assistant RH")
+    if onglet not in ("historique", "conges", "documents", "disciplinaire"):
+        onglet = "historique"
 
-    soldes = []
-    conges_pris = []
-    sanctions = []
+    # --- Chiffres clés ---
+    solde = _solde_conges(db, employe)
+    retraite = date_retraite(employe.date_naissance)
 
+    # --- Pièces du dossier (onglet Documents + alerte « dossier incomplet ») ---
+    pieces = [
+        ("Photo d'identité", employe.photo_path),
+        ("Carte nationale d'identité", employe.cni_path),
+        ("Plan de localisation", employe.plan_localisation_path),
+    ]
+    pieces_manquantes = [libelle for libelle, chemin in pieces if not chemin]
+
+    # --- Absence en cours aujourd'hui ---
+    absence_en_cours = (
+        db.query(models.Absence)
+        .filter(models.Absence.employe_id == employe_id,
+                models.Absence.date_debut <= aujourdhui,
+                models.Absence.date_fin >= aujourdhui)
+        .order_by(models.Absence.date_debut.desc())
+        .first()
+    )
+
+    # --- Départ enregistré mais pas encore effectif (sortie programmée) ---
+    depart_programme = None
+    if employe.statut == "actif":
+        depart_programme = (
+            db.query(models.Depart)
+            .filter(models.Depart.employe_id == employe_id, models.Depart.date_depart > aujourdhui)
+            .order_by(models.Depart.date_depart)
+            .first()
+        )
+
+    # --- Compte d'accès et dernière connexion (lue dans le journal d'audit) ---
+    compte = db.query(models.Utilisateur).filter_by(employe_id=employe_id).first()
+    derniere_connexion = None
+    if compte:
+        derniere = (
+            db.query(models.JournalAudit)
+            .filter_by(utilisateur_id=compte.id, action="connexion")
+            .order_by(models.JournalAudit.date_heure.desc())
+            .first()
+        )
+        derniere_connexion = derniere.date_heure if derniere else None
+
+    # --- Données propres à l'onglet affiché ---
+    historique = _historique_employe(db, employe_id) if onglet == "historique" else []
+    absences = []
     if onglet == "conges":
-        soldes = (
-            db.query(models.SoldeConge)
+        absences = (
+            db.query(models.Absence)
             .filter_by(employe_id=employe_id)
-            .order_by(models.SoldeConge.annee.desc())
+            .order_by(models.Absence.date_debut.desc())
+            .limit(100)
             .all()
         )
-        type_conge = db.query(models.TypeAbsence).filter(models.TypeAbsence.libelle.ilike("%ongé%")).first()
-        if type_conge:
-            conges_pris = (
-                db.query(models.Absence)
-                .filter_by(employe_id=employe_id, type_absence_id=type_conge.id)
-                .order_by(models.Absence.date_debut.desc())
-                .all()
-            )
-
+    sanctions = []
     if onglet == "disciplinaire":
         sanctions = (
             db.query(models.Sanction)
@@ -298,20 +340,34 @@ def fiche_employe(employe_id: int, request: Request, onglet: str = "historique",
             .order_by(models.Sanction.date_sanction.desc())
             .all()
         )
+
     return templates.TemplateResponse(request, "fiche_employe.html", {
         "employe": employe,
-        "historique": historique,
+        "est_rh": est_rh,
+        "aujourdhui": aujourdhui,
+        "onglet": onglet,
         "anciennete": _anciennete(employe.date_embauche),
         "age": _age_annees(employe.date_naissance),
-        "onglet": onglet,
-        "soldes": soldes,
-        "conges_pris": conges_pris,
+        "age_retraite": AGE_RETRAITE,
+        "date_retraite": retraite,
+        # Alerte si le départ à la retraite tombe dans les 12 prochains mois
+        "retraite_proche": bool(employe.statut == "actif" and retraite
+                                and aujourdhui <= retraite <= aujourdhui + timedelta(days=365)),
+        "solde": solde,
+        "pieces": pieces,
+        "pieces_manquantes": pieces_manquantes,
+        "absence_en_cours": absence_en_cours,
+        "depart_programme": depart_programme,
+        "compte": compte,
+        "derniere_connexion": derniere_connexion,
+        "historique": historique,
+        "absences": absences,
         "sanctions": sanctions,
         # [ÉTAPE 3] procédure de licenciement en cours (affichée aux RH uniquement)
         "dossier_licenciement": db.query(models.Licenciement).filter(
             models.Licenciement.employe_id == employe_id,
             models.Licenciement.statut.in_(["ouvert", "complement", "transmis", "approuve"]),
-        ).first(),
+        ).first() if est_rh else None,
     })
 
 

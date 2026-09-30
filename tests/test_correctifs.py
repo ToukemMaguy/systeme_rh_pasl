@@ -489,6 +489,35 @@ db.delete(db.get(models.Utilisateur, U_EMP)); db.commit()
 r = alice.get("/employes")
 check("F2 compte supprimé déconnecté", r.status_code in (302, 303, 307) and "/login" in r.headers.get("location", ""), f"HTTP {r.status_code} -> {r.headers.get('location')}")
 
+# ================= Étape 5 : nouvelle fiche employé =================
+from app.regles_rh import date_retraite
+check("Retraite : date des 60 ans", date_retraite(date(1970, 5, 14)) == date(2030, 5, 14))
+check("Retraite : 29 février → 28 février", date_retraite(date(2040, 2, 29)) == date(2100, 2, 28))
+f_emp = models.Employe(nom="FOUDA", prenom="Rose", genre="F", date_embauche=date(2000, 3, 1), departement_id=1, poste_id=1, grade_id=1,
+                       n_plus_1_id=CHEF_ID, date_naissance=date.today().replace(day=1) - timedelta(days=365 * 60 - 120),
+                       email_pro="r.fouda@pasl.cm", statut_matrimonial="Mariée", nombre_enfants=3, contact_urgence_nom="FOUDA Paul")
+db.add(f_emp); db.flush()
+t_abs = db.query(models.TypeAbsence).first()
+if t_abs:
+    db.add(models.Absence(employe_id=f_emp.id, type_absence_id=t_abs.id, date_debut=date.today() - timedelta(days=1), date_fin=date.today() + timedelta(days=2)))
+db.commit()
+F_ID = f_emp.id
+page = rh.get(f"/employes/{F_ID}").text
+check("Fiche : alerte dossier incomplet", "Dossier incomplet" in page)
+check("Fiche : alerte départ à la retraite (< 12 mois)", "Départ à la retraite" in page)
+check("Fiche : absence en cours signalée", (not t_abs) or f"au {(date.today() + timedelta(days=2)).strftime('%d/%m/%Y')}" in page)
+check("Fiche : champs jusque-là masqués affichés", all(x in page for x in ["r.fouda@pasl.cm", "Mariée", "3 enfants", "FOUDA Paul"]))
+check("Fiche : solde de congés affiché", "Congés disponibles" in page)
+check("Fiche : bouton « Engager une procédure » visible (RH)", "Engager une procédure de licenciement" in page)
+page_c = comite.get(f"/employes/{F_ID}").text
+check("Fiche Comité : ni Modifier, ni licenciement", "/modifier" not in page_c and "licenciement/nouveau" not in page_c)
+for o in ["conges", "documents", "disciplinaire", "inconnu"]:
+    r = rh.get(f"/employes/{F_ID}?onglet={o}")
+    check(f"Fiche : onglet {o}", r.status_code == 200, f"HTTP {r.status_code}")
+check("Fiche : onglet documents compte les pièces manquantes", "Manquant" in rh.get(f"/employes/{F_ID}?onglet=documents").text)
+check("Fiche Comité : pas de bouton d'ajout de sanction", "sanctions/nouvelle" not in comite.get(f"/employes/{F_ID}?onglet=disciplinaire").text)
+check("Fiche : dernière connexion lue dans le journal", "dernière connexion le" in rh.get(f"/employes/{CHEF_ID}").text)
+
 # --- Pages principales toujours fonctionnelles ---
 for url in ["/", "/employes", f"/employes/{EMP_ID}?onglet=conges", "/demandes", "/absences?periode=toutes", "/conges",
             f"/employes/{EMP_ID}/pdf/fiche", "/export/dashboard.xlsx", "/export/dashboard.csv"]:

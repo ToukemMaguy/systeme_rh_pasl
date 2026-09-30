@@ -126,6 +126,20 @@ def _valeurs_depuis_employe(employe: models.Employe) -> dict:
     }
 
 
+# Âge légal de départ à la retraite appliqué à la PASL (confirmé par la RH)
+AGE_RETRAITE = 60
+
+
+def date_retraite(date_naissance) -> date | None:
+    """Date des 60 ans (un 29 février devient le 28 février les années non bissextiles)."""
+    if not date_naissance:
+        return None
+    try:
+        return date_naissance.replace(year=date_naissance.year + AGE_RETRAITE)
+    except ValueError:
+        return date(date_naissance.year + AGE_RETRAITE, 2, 28)
+
+
 def _age_annees(date_naissance) -> int | None:
     if not date_naissance:
         return None
