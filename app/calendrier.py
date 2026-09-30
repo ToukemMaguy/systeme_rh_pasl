@@ -4,9 +4,11 @@ Avant : un congé du vendredi au lundi comptait 4 jours (dimanche et samedi incl
 Le Code du travail camerounais (art. 89) exprime le congé en jours OUVRABLES :
 tous les jours sauf le dimanche et les jours fériés.
 
-À faire valider par le service RH de PASL :
-  - si PASL décompte en jours OUVRÉS (lundi-vendredi), remplacer JOURS_OUVRABLES par {0, 1, 2, 3, 4} ;
-  - compléter chaque année FETES_A_DATE_VARIABLE (fêtes musulmanes, annoncées par le gouvernement).
+Validé par la RH de PASL : semaine de travail de 6 jours, du lundi au samedi.
+Un jour de congé posé un samedi est donc décompté ; le dimanche et les jours fériés ne le sont pas.
+
+À faire par la RH chaque année :
+  - compléter FETES_A_DATE_VARIABLE (fêtes musulmanes, annoncées par le gouvernement).
 """
 from datetime import date, timedelta
 

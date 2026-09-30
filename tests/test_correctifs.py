@@ -103,7 +103,8 @@ check("B1 pas de mail en double", len(mails) == len({(m.destinataire, m.type_mai
       f"{[(m.destinataire, m.type_mail) for m in mails]}")
 
 # --- B2/B3 : même solde partout ---
-check("B2 quota 1,5 j/mois", float(M.QUOTA_CONGES_PAR_MOIS) == 1.5, str(M.QUOTA_CONGES_PAR_MOIS))
+check("Quota PASL 2 j/mois", float(M.QUOTA_CONGES_PAR_MOIS) == 2, str(M.QUOTA_CONGES_PAR_MOIS))
+check("Samedi travaillé (semaine de 6 jours)", nb_jours_ouvrables(date(2026, 10, 10), date(2026, 10, 10)) == 1)
 if hasattr(M, "_solde_conges"):
     s = M._solde_conges(db, db.get(models.Employe, EMP_ID))
     check("B3 fonction unique de solde", True, f"alloué={s['total_alloue']} pris={s['total_pris']} restant={s['total_restant']}")

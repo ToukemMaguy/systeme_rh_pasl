@@ -65,10 +65,11 @@ app/
 
 ## Calendrier des congés (`app/calendrier.py`)
 
-Les congés annuels sont décomptés en **jours ouvrables** (dimanches et jours fériés exclus).
+Chaque employé acquiert **2 jours de congé par mois** de service (24 jours par an), constante
+`QUOTA_CONGES_PAR_MOIS` dans `app/regles_rh.py`. La semaine de travail PASL compte **6 jours
+(lundi au samedi)** : les congés sont décomptés en **jours ouvrables** (dimanches et jours fériés exclus).
 Chaque année, la RH doit ajouter les dates des fêtes musulmanes (Aïd el-Fitr, Tabaski) dans
-`FETES_A_DATE_VARIABLE` dès leur annonce officielle. Si PASL décompte en jours ouvrés
-(lundi-vendredi), remplacer `JOURS_OUVRABLES` par `{0, 1, 2, 3, 4}`.
+`FETES_A_DATE_VARIABLE` dès leur annonce officielle.
 
 ## Tests
 

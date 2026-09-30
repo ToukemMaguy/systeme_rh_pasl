@@ -6,9 +6,10 @@ from . import models
 from .notifications import notifier_n_plus_1_a_reaffecter
 
 
-# [CORRECTIF B2] Code du travail camerounais (art. 89) : 1,5 jour de congé par mois de service effectif.
-# L'ancienne valeur (2) gonflait tous les soldes de 33 %.
-QUOTA_CONGES_PAR_MOIS = 1.5
+# Règle PASL (confirmée par la RH) : 2 jours ouvrables de congé par mois de service, soit 24 jours par an.
+# C'est plus favorable que le minimum du Code du travail camerounais (art. 89 : 1,5 jour par mois).
+# Le solde est recalculé depuis la date d'embauche : modifier cette valeur change TOUS les soldes.
+QUOTA_CONGES_PAR_MOIS = 2
 PLAFOND_PERMISSION_JOURS = 3  # Au-delà, les jours supplémentaires sont déduits du congé annuel
 
 # [CORRECTIF B7] Tous les statuts qui signifient « demande pas encore tranchée ».
@@ -29,7 +30,7 @@ def _mois_travailles(date_embauche, jusqua) -> int:
 
 
 def _solde_alloue_cumule(date_embauche, jusqua=None) -> float:
-    """Jours de congé cumulés depuis l'embauche, à raison de 1,5 jour par mois travaillé."""
+    """Jours de congé cumulés depuis l'embauche, à raison de QUOTA_CONGES_PAR_MOIS jours par mois travaillé."""
     jusqua = jusqua or date.today()
     return round(_mois_travailles(date_embauche, jusqua) * QUOTA_CONGES_PAR_MOIS, 1)
 
