@@ -164,5 +164,7 @@ LIBELLES_COLONNES = {
     "avis_n_plus_1": "Avis du N+1", "periode_accordee_debut": "Début accordé", "periode_accordee_fin": "Fin accordée",
     "role": "Rôle", "mot_de_passe_hash": "Mot de passe", "compte_actif": "Compte actif",
     "doit_changer_mdp": "Mot de passe à changer", "bloque_jusqua": "Bloqué jusqu'à",
-    "lettre_texte": "Texte de la lettre", "date_depart": "Date de départ", "type_depart": "Type de départ", "commentaire": "Commentaire",
+    "lettre_texte": "Texte de la lettre", "seuil_presence_min": "Seuil de présence (agents)", "lieu_naissance": "Lieu de naissance", "nationalite": "Nationalité",
+    "numero_cni": "N° de CNI", "cni_delivree_le": "CNI délivrée le", "adresse": "Adresse", "numero_cnps": "N° CNPS",
+    "niveau_etudes": "Niveau d'études", "date_depart": "Date de départ", "type_depart": "Type de départ", "commentaire": "Commentaire",
 }

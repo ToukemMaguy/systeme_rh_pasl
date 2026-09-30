@@ -123,6 +123,34 @@ def _valeurs_depuis_employe(employe: models.Employe) -> dict:
         "email_pro": employe.email_pro or "",
         "email_perso": employe.email_perso or "",
         "n_plus_1_id": employe.n_plus_1_id,
+        # Fiche signalétique
+        "lieu_naissance": employe.lieu_naissance or "",
+        "nationalite": employe.nationalite or "",
+        "numero_cni": employe.numero_cni or "",
+        "cni_delivree_le": employe.cni_delivree_le.isoformat() if employe.cni_delivree_le else "",
+        "adresse": employe.adresse or "",
+        "numero_cnps": employe.numero_cnps or "",
+        "niveau_etudes": employe.niveau_etudes or "",
+    }
+
+
+def contexte_fiche_pdf(db: Session, employe: models.Employe, edite_par: str | None) -> dict:
+    """Données de la fiche signalétique PDF (utilisée par la RH et par l'employé dans son espace)."""
+    return {
+        "historique": _historique_employe(db, employe.id),
+        "sanctions": db.query(models.Sanction).filter_by(employe_id=employe.id)
+                       .order_by(models.Sanction.date_sanction.desc()).all(),
+        "solde": _solde_conges(db, employe),
+        "absences": db.query(models.Absence).filter_by(employe_id=employe.id)
+                      .order_by(models.Absence.date_debut.desc()).limit(8).all(),
+        "n_plus_1": employe.n_plus_1,
+        "anciennete": _anciennete(employe.date_embauche),
+        "age": _age_annees(employe.date_naissance),
+        "date_retraite": date_retraite(employe.date_naissance),
+        "pieces": [("Photo d'identité", bool(employe.photo_path)),
+                   ("Carte nationale d'identité", bool(employe.cni_path)),
+                   ("Plan de localisation", bool(employe.plan_localisation_path))],
+        "edite_par": edite_par,
     }
 
 

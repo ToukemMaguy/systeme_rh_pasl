@@ -8,8 +8,8 @@ from sqlalchemy.exc import IntegrityError
 from ..database import get_db
 from .. import models
 from .. import pdf as pdf_module
-from ..outils import _date_ou_none, _email_valide, _enregistrer_fichier, _entier_ou_none, _exiger_chef_rh, _exiger_lecture, _exiger_non_employe, _exiger_rh, _valider_saisies_employe, templates
-from ..regles_rh import AGE_RETRAITE, date_retraite, _age_annees, _anciennete, _employe_ou_404, _historique_employe, _solde_conges, _tranche_age, _valeurs_depuis_employe
+from ..outils import verifier_fichier, _date_ou_none, _email_valide, _enregistrer_fichier, _entier_ou_none, _exiger_chef_rh, _exiger_lecture, _exiger_non_employe, _exiger_rh, _valider_saisies_employe, templates
+from ..regles_rh import AGE_RETRAITE, contexte_fiche_pdf, date_retraite, _age_annees, _anciennete, _employe_ou_404, _historique_employe, _solde_conges, _tranche_age, _valeurs_depuis_employe
 
 router = APIRouter()
 
@@ -46,6 +46,42 @@ def _contexte_reference_employe(db: Session, employe_id_exclu: int | None = None
         "n_plus_1_possibles": n_plus_1_possibles,
         "n_plus_1_data": n_plus_1_data,
     }
+
+# ------------------------------------------------------------------
+# Fiche signalétique : 7 champs administratifs facultatifs, communs à la création et à la modification
+# ------------------------------------------------------------------
+def _infos_signaletiques(
+    lieu_naissance: str = Form(""),
+    nationalite: str = Form(""),
+    numero_cni: str = Form(""),
+    cni_delivree_le: str = Form(""),
+    adresse: str = Form(""),
+    numero_cnps: str = Form(""),
+    niveau_etudes: str = Form(""),
+) -> dict:
+    """Saisie brute (réaffichée telle quelle en cas d'erreur dans le formulaire)."""
+    return {
+        "lieu_naissance": lieu_naissance.strip(), "nationalite": nationalite.strip(),
+        "numero_cni": numero_cni.strip(), "cni_delivree_le": cni_delivree_le.strip(),
+        "adresse": adresse.strip(), "numero_cnps": numero_cnps.strip(), "niveau_etudes": niveau_etudes.strip(),
+    }
+
+
+def _erreur_infos_signaletiques(infos: dict) -> str | None:
+    if infos["cni_delivree_le"]:
+        delivree = _date_ou_none(infos["cni_delivree_le"])
+        if not delivree:
+            return "La date de délivrance de la CNI n'est pas valide."
+        if delivree > date.today():
+            return "La date de délivrance de la CNI ne peut pas être dans le futur."
+    return None
+
+
+def _appliquer_infos_signaletiques(employe: models.Employe, infos: dict) -> None:
+    for champ in ("lieu_naissance", "nationalite", "numero_cni", "adresse", "numero_cnps", "niveau_etudes"):
+        setattr(employe, champ, infos[champ] or None)
+    employe.cni_delivree_le = _date_ou_none(infos["cni_delivree_le"])
+
 
 def _valider_donnees_employe(genre: str, date_embauche: str, date_naissance: str = "") -> str | None:
     if genre not in ("H", "F"):
@@ -170,6 +206,7 @@ def creer_employe(
     cni: UploadFile = File(None),
     plan_localisation: UploadFile = File(None),
     n_plus_1_id: str = Form(""),
+    infos: dict = Depends(_infos_signaletiques),
 ):
     _exiger_rh(request)
 
@@ -188,10 +225,13 @@ def creer_employe(
         "email_pro": email_pro,
         "email_perso": email_perso,
         "n_plus_1_id": _entier_ou_none(n_plus_1_id),
+        **infos,
     }
 
     erreur = (_valider_donnees_employe(genre, date_embauche, date_naissance)
-              or _valider_saisies_employe(nombre_enfants, email_pro, email_perso))
+              or _valider_saisies_employe(nombre_enfants, email_pro, email_perso)
+              or _erreur_infos_signaletiques(infos)
+              or verifier_fichier(photo, images_seulement=True) or verifier_fichier(cni) or verifier_fichier(plan_localisation))
     if erreur:
         return templates.TemplateResponse(request, "formulaire_employe.html", {
             "mode": "creation", "valeurs": valeurs, "employe_id": None, "erreur": erreur,
@@ -227,6 +267,7 @@ def creer_employe(
         email_perso=_email_valide(email_perso),
         n_plus_1_id=n_plus_1_id_final,
     )
+    _appliquer_infos_signaletiques(employe, infos)
     db.add(employe)
     try:
         db.commit()
@@ -413,6 +454,7 @@ def modifier_employe(
     cni: UploadFile = File(None),
     plan_localisation: UploadFile = File(None),
     n_plus_1_id: str = Form(""),
+    infos: dict = Depends(_infos_signaletiques),
 ):
     _exiger_rh(request)
 
@@ -434,10 +476,13 @@ def modifier_employe(
         "email_pro": email_pro,
         "email_perso": email_perso,
         "n_plus_1_id": _entier_ou_none(n_plus_1_id),
+        **infos,
     }
 
     erreur = (_valider_donnees_employe(genre, date_embauche, date_naissance)
-              or _valider_saisies_employe(nombre_enfants, email_pro, email_perso))
+              or _valider_saisies_employe(nombre_enfants, email_pro, email_perso)
+              or _erreur_infos_signaletiques(infos)
+              or verifier_fichier(photo, images_seulement=True) or verifier_fichier(cni) or verifier_fichier(plan_localisation))
     if erreur:
         return templates.TemplateResponse(request, "formulaire_employe.html", {
             "mode": "edition", "valeurs": valeurs, "employe_id": employe_id, "erreur": erreur,
@@ -483,6 +528,7 @@ def modifier_employe(
     employe.email_pro = _email_valide(email_pro)
     employe.email_perso = _email_valide(email_perso)
     employe.n_plus_1_id = n_plus_1_id_final
+    _appliquer_infos_signaletiques(employe, infos)
 
     chemin_photo = _enregistrer_fichier(photo, employe.id, "photo")
     chemin_cni = _enregistrer_fichier(cni, employe.id, "cni")
@@ -634,31 +680,8 @@ def supprimer_sanction(
 def pdf_fiche_employe(employe_id: int, request: Request, db: Session = Depends(get_db)):
     _exiger_lecture(request)
     employe = _employe_ou_404(db, employe_id)
-    historique = _historique_employe(db, employe_id)
-    sanctions = (
-        db.query(models.Sanction)
-        .filter_by(employe_id=employe_id)
-        .order_by(models.Sanction.date_sanction.desc())
-        .all()
-    )
-
-    # [CORRECTIF B3] Solde calculé par la fonction commune (avant : « années × 18 », différent des écrans)
-    solde = _solde_conges(db, employe)
-
-    # Historique des congés pris (absences de type congé)
-    type_conge = db.query(models.TypeAbsence).filter(models.TypeAbsence.libelle.ilike("%ongé%")).first()
-    conges_pris = []
-    if type_conge:
-        conges_pris = (
-            db.query(models.Absence)
-            .filter_by(employe_id=employe_id, type_absence_id=type_conge.id)
-            .order_by(models.Absence.date_debut.desc())
-            .all()
-        )
-
-    soldes_conges = {**solde, "conges_pris": conges_pris}
-
-    contenu = pdf_module.generer_fiche_employe_pdf(employe, historique, sanctions, soldes_conges)
+    # [ÉTAPE 5] Fiche signalétique : données préparées par une fonction commune (RH et espace employé)
+    contenu = pdf_module.generer_fiche_employe_pdf(employe, contexte_fiche_pdf(db, employe, request.session.get("nom")))
     nom_fichier = f"fiche_{employe.matricule or employe.id}_{employe.nom}_{employe.prenom}.pdf".replace(" ", "_")
 
     return Response(

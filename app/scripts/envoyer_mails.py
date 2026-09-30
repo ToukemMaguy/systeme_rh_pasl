@@ -20,6 +20,9 @@ from app import models
 # Charge les variables d'environnement depuis .env
 load_dotenv()
 
+# Pause entre deux mails (limites d'envoi du fournisseur ; 1,5 s convenait à Mailtrap)
+PAUSE_ENTRE_MAILS = float(os.getenv("SMTP_PAUSE", "1.5"))
+
 SMTP_SERVER = os.getenv("SMTP_SERVER", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
@@ -40,6 +43,14 @@ def envoyer_mail(destinataire, sujet, corps):
         serveur.starttls()
         serveur.login(SMTP_USER, SMTP_PASSWORD)
         serveur.send_message(msg)
+
+
+def _erreur_du_destinataire(e: Exception) -> bool:
+    """Vrai si l'échec vient de CE mail (adresse refusée, contenu rejeté), faux si c'est le serveur qui
+    est indisponible. Attention : toutes les erreurs smtplib héritent de OSError, d'où ce tri explicite."""
+    if "too many" in str(e).lower() or "rate limit" in str(e).lower():
+        return False
+    return isinstance(e, (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError))
 
 
 def traiter_file_attente():
@@ -71,18 +82,25 @@ def traiter_file_attente():
                 envoyer_mail(mail.destinataire, mail.sujet, mail.corps)
                 mail.statut = "envoye"
                 mail.date_envoi = datetime.now()
+                # [PRODUCTION - POINT 6] enregistré tout de suite : si le script s'arrête en cours de route,
+                # les mails déjà partis ne seront pas renvoyés au passage suivant
+                db.commit()
                 print(f"  [OK] Envoyé à {mail.destinataire}")
-                time.sleep(1.5)  # Pause pour respecter la limite Mailtrap
+                time.sleep(PAUSE_ENTRE_MAILS)
             except Exception as e:
+                db.rollback()
                 message_erreur = str(e)
-                # Si c'est une limite de débit, on remet en attente pour un prochain envoi
-                if "Too many emails" in message_erreur or "rate limit" in message_erreur.lower():
-                    print(f"  [RETRY] Limite atteinte pour {mail.destinataire} — sera renvoyé plus tard")
-                    # On ne change PAS le statut → il restera "en_attente"
-                else:
+                if _erreur_du_destinataire(e):
+                    # Adresse refusée ou message rejeté : inutile de réessayer
                     mail.statut = "erreur"
                     mail.message_erreur = message_erreur[:500]
+                    db.commit()
                     print(f"  [ERREUR] Pour {mail.destinataire} : {e}")
+                else:
+                    # [PRODUCTION - POINT 6] serveur injoignable, limite d'envoi, identifiants... : les mails
+                    # RESTENT en attente et partiront au prochain passage (toutes les 10 minutes)
+                    print(f"  [PAUSE] Envoi interrompu ({e}) : nouvel essai au prochain passage.")
+                    break
 
         db.commit()
         print(f"[{datetime.now()}] Terminé.")

@@ -133,6 +133,39 @@
         </p>
       </div>
 
+      {# Fiche signalétique : informations administratives, toutes facultatives #}
+      <div class="col-span-2" style="margin-top:8px;padding-top:16px;border-top:1px solid var(--border);">
+        <div class="form-label" style="font-size:14px;margin:0;">Informations administratives (fiche signalétique)</div>
+        <p class="text-muted" style="font-size:12px;margin:4px 0 0;">Facultatives. Elles figurent sur la fiche signalétique PDF.</p>
+      </div>
+      <div>
+        <label class="form-label">Lieu de naissance (optionnel)</label>
+        <input type="text" name="lieu_naissance" class="form-control" maxlength="100" value="{{ valeurs.lieu_naissance or '' }}" placeholder="ex: Yaoundé">
+      </div>
+      <div>
+        <label class="form-label">Nationalité (optionnel)</label>
+        <input type="text" name="nationalite" class="form-control" maxlength="60" value="{{ valeurs.nationalite or '' }}" placeholder="ex: Camerounaise">
+      </div>
+      <div>
+        <label class="form-label">N° de CNI (optionnel)</label>
+        <input type="text" name="numero_cni" class="form-control" maxlength="30" value="{{ valeurs.numero_cni or '' }}">
+      </div>
+      <div>
+        <label class="form-label">CNI délivrée le (optionnel)</label>
+        <input type="date" name="cni_delivree_le" class="form-control" value="{{ valeurs.cni_delivree_le or '' }}">
+      </div>
+      <div>
+        <label class="form-label">N° CNPS (optionnel)</label>
+        <input type="text" name="numero_cnps" class="form-control" maxlength="30" value="{{ valeurs.numero_cnps or '' }}">
+      </div>
+      <div>
+        <label class="form-label">Niveau d'études / dernier diplôme (optionnel)</label>
+        <input type="text" name="niveau_etudes" class="form-control" maxlength="150" value="{{ valeurs.niveau_etudes or '' }}" placeholder="ex: Licence en comptabilité">
+      </div>
+      <div class="col-span-2">
+        <label class="form-label">Adresse — quartier, ville (optionnel)</label>
+        <input type="text" name="adresse" class="form-control" maxlength="255" value="{{ valeurs.adresse or '' }}" placeholder="ex: Bonamoussadi, Douala">
+      </div>
 
       {% if mode == "edition" %}
       <div class="col-span-2">
@@ -150,21 +183,21 @@
           {% if valeurs.photo_path %}
           <div style="margin-bottom:6px;"><a href="/{{ valeurs.photo_path }}" target="_blank" class="small text-muted"><i class="fas fa-image"></i> Fichier actuel</a></div>
           {% endif %}
-          <input type="file" name="photo" class="form-control" accept="image/*">
+          <input type="file" name="photo" class="form-control" accept=".jpg,.jpeg,.png">
         </div>
         <div>
           <label class="form-label">Carte Nationale d'Identité</label>
           {% if valeurs.cni_path %}
           <div style="margin-bottom:6px;"><a href="/{{ valeurs.cni_path }}" target="_blank" class="small text-muted"><i class="fas fa-id-card"></i> Fichier actuel</a></div>
           {% endif %}
-          <input type="file" name="cni" class="form-control" accept="image/*,.pdf">
+          <input type="file" name="cni" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
         </div>
         <div class="col-span-2">
           <label class="form-label">Plan de localisation</label>
           {% if valeurs.plan_localisation_path %}
           <div style="margin-bottom:6px;"><a href="/{{ valeurs.plan_localisation_path }}" target="_blank" class="small text-muted"><i class="fas fa-map"></i> Fichier actuel</a></div>
           {% endif %}
-          <input type="file" name="plan_localisation" class="form-control" accept="image/*,.pdf">
+          <input type="file" name="plan_localisation" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
         </div>
       </div>
       <p class="small text-muted" style="margin-top:8px;">Laisser un champ vide conserve le fichier déjà enregistré.</p>

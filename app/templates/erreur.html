@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+{# [PRODUCTION - POINT 4] Page d'erreur en français (remplace « Internal Server Error » / « Not Found »).
+   Page autonome : elle doit s'afficher même si la base de données est arrêtée. #}
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ titre }} — Système RH</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/vendor/polices.css">
+  <link rel="stylesheet" href="/static/vendor/tailwind.css">
+</head>
+<body class="bg-surface font-sans text-[14px] text-on-surface antialiased min-h-screen flex items-center justify-center p-4">
+  <main class="w-full max-w-lg bg-surface-container-lowest rounded-xl shadow-xl overflow-hidden">
+    <div class="h-1.5 bg-gradient-to-r from-[#06547A] via-[#1a6682] to-[#B4D02E]"></div>
+    <div class="p-8 text-center">
+      <img src="/static/logo-pasl.jpg" alt="Pan-African Savings &amp; Loans" class="h-[56px] w-auto mx-auto mb-6">
+      <div class="text-[46px] font-bold text-primary-container leading-none">{{ code }}</div>
+      <h1 class="text-[20px] font-semibold mt-3">{{ titre }}</h1>
+      <p class="text-[14px] text-on-surface-variant mt-2 leading-relaxed">{{ message }}</p>
+      {% if reference %}
+      <p class="text-[12px] text-outline mt-4">Si le problème continue, communiquez au service informatique la référence :
+        <b class="text-on-surface">{{ reference }}</b></p>
+      {% endif %}
+      <div class="flex flex-wrap justify-center gap-3 mt-7">
+        <a href="javascript:history.back()" class="inline-flex items-center h-[40px] px-5 rounded-lg bg-surface-container-high text-on-surface text-[13px] font-semibold">Revenir en arrière</a>
+        <a href="/" class="inline-flex items-center h-[40px] px-5 rounded-lg bg-primary-container text-white text-[13px] font-semibold">Aller à l'accueil</a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

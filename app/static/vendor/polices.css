@@ -1,0 +1,22 @@
+/* Polices embarquées (point 8 : plus aucune dépendance à Internet pour l'affichage).
+   Inter : texte de l'application. Material Symbols Outlined : icônes. */
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("polices/inter-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("polices/inter-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("polices/inter-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("polices/inter-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Material Symbols Outlined"; font-style: normal; font-weight: 100 700; font-display: block;
+  src: url("polices/material-symbols-outlined.woff2") format("woff2");
+}

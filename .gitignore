@@ -15,3 +15,6 @@ data/
 *.db
 .vscode/
 .idea/
+outils_front/tailwindcss.exe
+logs/
+sauvegardes/

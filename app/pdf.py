@@ -15,8 +15,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.platypus import (
     SimpleDocTemplate, Spacer, Table, TableStyle,
-    Image, PageBreak, HRFlowable,
+    Image, PageBreak, HRFlowable, KeepTogether,
 )
+from reportlab.pdfgen import canvas as _canvas
 from reportlab.platypus import Paragraph as _ParagraphReportLab
 from xml.sax.saxutils import escape as _echapper
 
@@ -234,274 +235,293 @@ def _pied_de_page(canvas, doc):
 # ------------------------------------------------------------------
 # Helper : table de paires label / valeur
 # ------------------------------------------------------------------
-def _table_paires(paires, styles, largeur_label=30 * mm, largeur_valeur=52 * mm):
-    data = []
-    for label, valeur in paires:
-        data.append([
-            Paragraph(label, styles["PaslCellLabel"]),
-            Paragraph(str(valeur), styles["PaslCellValue"]),
-        ])
-    table = Table(data, colWidths=[largeur_label, largeur_valeur])
-    table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
-        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ("LINEBELOW", (0, 0), (-1, -1), 0.25, COULEUR_BORDURE),
+VERT_PASL = colors.HexColor("#B4D02E")
+LARGEUR = 180 * mm          # A4 (210) - marges 15 + 15
+JOUR = "%d/%m/%Y"
+
+
+def _nb(v) -> str:
+    """25 → « 25 », 22.5 → « 22,5 » (format français)."""
+    if v is None:
+        return "0"
+    v = float(v)
+    return str(int(v)) if v == int(v) else str(v).replace(".", ",")
+
+
+def _d(d) -> str:
+    return d.strftime(JOUR) if d else "—"
+
+
+class _CanevasNumerote(_canvas.Canvas):
+    """Ajoute « Page x / y » : on mémorise chaque page, puis on numérote à la fin."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._pages = []
+
+    def showPage(self):
+        self._pages.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        total = len(self._pages)
+        for etat in self._pages:
+            self.__dict__.update(etat)
+            self.setFont("Helvetica", 7.5)
+            self.setFillColor(COULEUR_GRIS)
+            self.drawRightString(195 * mm, 44.5 * mm, f"Page {self._pageNumber} / {total}")
+            super().showPage()
+        super().save()
+
+
+def _styles_fiche():
+    s = _styles()
+    s.add(ParagraphStyle("FLabel", fontName="Helvetica", fontSize=8, textColor=COULEUR_GRIS, leading=10))
+    s.add(ParagraphStyle("FValeur", fontName="Helvetica-Bold", fontSize=8.8, textColor=colors.black, leading=11))
+    s.add(ParagraphStyle("FVide", fontName="Helvetica-Oblique", fontSize=8.5, textColor=colors.HexColor("#A0AEC0"), leading=11))
+    s.add(ParagraphStyle("FNom", fontName="Helvetica-Bold", fontSize=17, textColor=COULEUR_PRIMAIRE, leading=21))
+    s.add(ParagraphStyle("FSous", fontName="Helvetica", fontSize=9.5, textColor=colors.black, leading=13))
+    s.add(ParagraphStyle("FPetit", fontName="Helvetica", fontSize=7.5, textColor=COULEUR_GRIS, leading=9.5))
+    s.add(ParagraphStyle("FPetitD", parent=s["FPetit"], alignment=TA_RIGHT))
+    s.add(ParagraphStyle("FTitreDoc", fontName="Helvetica-Bold", fontSize=13, textColor=colors.white, leading=16))
+    s.add(ParagraphStyle("FSection", fontName="Helvetica-Bold", fontSize=9.5, textColor=COULEUR_PRIMAIRE, leading=12))
+    s.add(ParagraphStyle("FCell", fontName="Helvetica", fontSize=8, leading=10))
+    s.add(ParagraphStyle("FCellH", fontName="Helvetica-Bold", fontSize=7.8, textColor=COULEUR_PRIMAIRE, leading=10))
+    s.add(ParagraphStyle("FPhoto", fontName="Helvetica", fontSize=7.5, textColor=colors.HexColor("#A0AEC0"), alignment=TA_CENTER, leading=10))
+    return s
+
+
+def _section(titre, st):
+    """Titre de section : texte bleu PASL + filet vert."""
+    t = Table([[Paragraph(titre.upper(), st["FSection"])]], colWidths=[LARGEUR])
+    t.setStyle(TableStyle([
+        ("LINEBELOW", (0, 0), (-1, -1), 1.2, VERT_PASL),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 3), ("TOPPADDING", (0, 0), (-1, -1), 0),
     ]))
-    return table
+    return [Spacer(1, 4 * mm), t, Spacer(1, 2 * mm)]
 
 
-# ------------------------------------------------------------------
-# Fiche employé PDF
-# ------------------------------------------------------------------
-def generer_fiche_employe_pdf(employe, historique, sanctions=None, soldes_conges=None) -> bytes:
-    """Fiche employé compacte : en-tête + 2 colonnes + historique + sanctions + congés."""
+def _grille(champs, st, colonnes=3):
+    """Champs « libellé au-dessus, valeur en dessous » répartis sur n colonnes (valeurs jamais coupées en plein mot)."""
+    cellules = []
+    for libelle, valeur in champs:
+        v = Paragraph(valeur, st["FValeur"]) if valeur not in (None, "", "—") else Paragraph("Non renseigné", st["FVide"])
+        cellules.append([Paragraph(libelle, st["FLabel"]), v] if libelle else "")
+    while len(cellules) % colonnes:
+        cellules.append("")
+    lignes = [cellules[i:i + colonnes] for i in range(0, len(cellules), colonnes)]
+    t = Table(lignes, colWidths=[LARGEUR / colonnes] * colonnes)
+    t.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+    ]))
+    return t
+
+
+def _tableau(entetes, lignes, largeurs, st):
+    data = [[Paragraph(h, st["FCellH"]) for h in entetes]]
+    data += [[Paragraph(str(c), st["FCell"]) for c in l] for l in lignes]
+    t = Table(data, colWidths=largeurs, repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E7EEFE")),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.3, COULEUR_BORDURE),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, COULEUR_FOND_ALT]),
+    ]))
+    return t
+
+
+def _cadre_photo(employe, st):
+    """Photo d'identité 30 x 38 mm ; si absente, cadre vide réservé (à coller à la main)."""
+    chemin = None
+    if employe.photo_path:
+        p = Path(employe.photo_path)
+        chemin = p if p.is_absolute() else Path("app") / p
+    contenu = ParagraphBalise("PHOTO<br/>D'IDENTITÉ", st["FPhoto"])
+    if chemin and chemin.exists():
+        try:
+            contenu = Image(str(chemin), width=30 * mm, height=38 * mm)
+        except Exception:
+            pass
+    t = Table([[contenu]], colWidths=[30 * mm], rowHeights=[38 * mm])
+    t.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#CBD5E0")),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    return t
+
+
+def generer_fiche_employe_pdf(employe, ctx) -> bytes:
+    """[ÉTAPE 5] Fiche signalétique de l'employé (maquette validée par la RH le 30/09/2026).
+    ctx est préparé par regles_rh.contexte_fiche_pdf() : historique, sanctions, solde, absences, n_plus_1,
+    anciennete, age, date_retraite, pieces [(libellé, fourni)], edite_par.
+    Sans photo, un cadre vide « Photo d'identité » est réservé."""
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        leftMargin=15 * mm, rightMargin=15 * mm,
-        topMargin=12 * mm, bottomMargin=45 * mm,
-        title=f"Fiche employé - {employe.nom} {employe.prenom}",
-    )
-    styles = _styles()
-    elements = _entete_pasl(styles, employe)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
+                            topMargin=10 * mm, bottomMargin=48 * mm,
+                            title=f"Fiche signalétique - {employe.nom} {employe.prenom}")
+    st = _styles_fiche()
+    el = []
 
-    elements.append(Paragraph("FICHE EMPLOYÉ", styles["PaslDocumentTitre"]))
+    # ---------- En-tête : logo + raison sociale | mentions d'édition ----------
+    logo = Image(str(CHEMIN_LOGO), width=36 * mm, height=13.9 * mm) if CHEMIN_LOGO.exists() else ""
+    gauche = Table([[logo, [Paragraph(PASL_NOM, st["FSection"]), Paragraph(PASL_SLOGAN, st["FPetit"])]]],
+                   colWidths=[40 * mm, 70 * mm])
+    gauche.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
+    droite = [Paragraph(f"Édité le {date.today().strftime(JOUR)}", st["FPetitD"]),
+              Paragraph(f"par {_e(ctx.get('edite_par') or '—')}", st["FPetitD"]),
+              ParagraphBalise("<font color='#9B2C2C'><b>DOCUMENT CONFIDENTIEL</b></font>", st["FPetitD"])]
+    entete = Table([[gauche, droite]], colWidths=[120 * mm, 60 * mm])
+    entete.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
+    el.append(entete)
+    el.append(Spacer(1, 3 * mm))
 
-    age_str = "—"
-    if employe.date_naissance:
-        auj = date.today()
-        age = auj.year - employe.date_naissance.year
-        if (auj.month, auj.day) < (employe.date_naissance.month, employe.date_naissance.day):
-            age -= 1
-        age_str = f"{age} ans"
-
-     # --- Colonne 1 : état civil ---
-    paires_col1 = [
-        ("Matricule", employe.matricule or "—"),
-        ("Nom", employe.nom or "—"),
-        ("Prénom", employe.prenom or "—"),
-        ("Genre", "Homme" if employe.genre == "H" else "Femme"),
-        ("Naissance", employe.date_naissance.strftime("%d/%m/%Y") if employe.date_naissance else "—"),
-        ("Âge", age_str),
-    ]
-    table_col1 = _table_paires(paires_col1, styles, largeur_label=18 * mm, largeur_valeur=42 * mm)
-
-    # --- Colonne 2 : situation familiale + contact ---
-    paires_col2 = [
-        ("Statut matrimonial", employe.statut_matrimonial or "—"),
-        ("Nombre d'enfants", str(employe.nombre_enfants) if employe.nombre_enfants is not None else "—"),
-        ("Tél. pro", employe.telephone_pro or "—"),
-        ("Tél. perso", employe.telephone_perso or "—"),
-        ("Email", employe.email_perso or "—"),
-    ]
-    table_col2 = _table_paires(paires_col2, styles, largeur_label=28 * mm, largeur_valeur=32 * mm)
-
-    # --- Colonne 3 : pro ---
-    paires_col3 = [
-        ("Département", employe.departement.nom if employe.departement else "—"),
-        ("Agence", employe.agence.nom if employe.agence else "Direction Générale"),
-        ("Poste", employe.poste.intitule if employe.poste else "—"),
-        ("Grade", employe.grade.libelle if employe.grade else "—"),
-        ("Embauche", employe.date_embauche.strftime("%d/%m/%Y") if employe.date_embauche else "—"),
-        ("Statut", "Actif" if employe.statut == "actif" else "Inactif"),
-    ]
-    table_col3 = _table_paires(paires_col3, styles, largeur_label=20 * mm, largeur_valeur=40 * mm)
-
-    # --- Contact d'urgence (ligne du dessous, pleine largeur) ---
-    contact_urgence_txt = "—"
-    if employe.contact_urgence_nom or employe.contact_urgence_tel:
-        contact_urgence_txt = (
-            f"{employe.contact_urgence_nom or '—'} "
-            f"— Tél. : {employe.contact_urgence_tel or '—'}"
-        )
-
-    # --- Tableau 3 colonnes ---
-    ligne_3_colonnes = Table(
-        [[table_col1, table_col2, table_col3]],
-        colWidths=[60 * mm, 60 * mm, 60 * mm],
-    )
-    ligne_3_colonnes.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (0, 0), 0),
-        ("LEFTPADDING", (1, 0), (1, 0), 6),
-        ("LEFTPADDING", (2, 0), (2, 0), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    # ---------- Bandeau titre ----------
+    bandeau = Table([[Paragraph("FICHE SIGNALÉTIQUE DE L'EMPLOYÉ", st["FTitreDoc"])]], colWidths=[LARGEUR])
+    bandeau.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), COULEUR_PRIMAIRE),
+        ("LINEBELOW", (0, 0), (-1, -1), 3, VERT_PASL),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8), ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
-    elements.append(ligne_3_colonnes)
-    elements.append(Spacer(1, 2 * mm))
+    el.append(bandeau)
+    el.append(Spacer(1, 5 * mm))
 
-    # --- Ligne contact d'urgence en pleine largeur ---
-    elements.append(ParagraphBalise(
-        f"<b><font color='#06547A'>Contact d'urgence :</font></b> {_e(contact_urgence_txt)}",
-        styles["PaslCellValue"]
-    ))
-    elements.append(Spacer(1, 4 * mm))
+    # ---------- Bloc identité : photo + résumé ----------
+    statut = "Actif" if employe.statut == "actif" else "Inactif (sorti des effectifs)"
+    couleur_statut = "#166534" if employe.statut == "actif" else "#9B2C2C"
+    resume = [
+        Paragraph(f"{employe.nom} {employe.prenom}", st["FNom"]),
+        Spacer(1, 1 * mm),
+        ParagraphBalise(f"<b>{_e(employe.poste.intitule if employe.poste else '—')}</b> · "
+                        f"{_e(employe.grade.libelle if employe.grade else '—')}", st["FSous"]),
+        Paragraph(f"{employe.departement.nom if employe.departement else '—'} · "
+                  f"{employe.agence.nom if employe.agence else 'Direction Générale'}", st["FSous"]),
+        Spacer(1, 3 * mm),
+    ]
+    chiffres = Table([[
+        [Paragraph("Matricule", st["FLabel"]), Paragraph(employe.matricule or "—", st["FValeur"])],
+        [Paragraph("Statut", st["FLabel"]), ParagraphBalise(f"<font color='{couleur_statut}'><b>{statut}</b></font>", st["FValeur"])],
+        [Paragraph("Ancienneté", st["FLabel"]), Paragraph(ctx.get("anciennete") or "—", st["FValeur"])],
+        [Paragraph("Congés disponibles", st["FLabel"]), Paragraph(f"{_nb(ctx['solde']['total_restant'])} jours", st["FValeur"])],
+    ]], colWidths=[34 * mm, 42 * mm, 34 * mm, 34 * mm])
+    chiffres.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), COULEUR_FOND_ALT), ("BOX", (0, 0), (-1, -1), 0.3, COULEUR_BORDURE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5), ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    resume.append(chiffres)
+    bloc = Table([[_cadre_photo(employe, st), resume]], colWidths=[36 * mm, 144 * mm])
+    bloc.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
+    el.append(bloc)
 
-    # --- Historique de carrière ---
-    if historique:
-        elements.append(Paragraph("Historique de carrière", styles["PaslSection"]))
-        lignes = [[
-            Paragraph("Type", styles["PaslCellHeader"]),
-            Paragraph("Début", styles["PaslCellHeader"]),
-            Paragraph("Fin", styles["PaslCellHeader"]),
-            Paragraph("Poste", styles["PaslCellHeader"]),
-            Paragraph("Département / Agence", styles["PaslCellHeader"]),
-            Paragraph("Grade", styles["PaslCellHeader"]),
-        ]]
-        for h in historique:
-            lignes.append([
-                Paragraph((h.type_mouvement or "—").replace("_", " ").capitalize(), styles["PaslCellValue"]),
-                Paragraph(h.date_debut.strftime("%d/%m/%Y") if h.date_debut else "—", styles["PaslCellValue"]),
-                Paragraph(h.date_fin.strftime("%d/%m/%Y") if h.date_fin else "En cours", styles["PaslCellValue"]),
-                Paragraph(h.poste.intitule if h.poste else "—", styles["PaslCellValue"]),
-                Paragraph(
-                    (h.departement.nom if h.departement else "—")
-                    + (" / " + h.agence.nom if h.agence else ""),
-                    styles["PaslCellValue"],
-                ),
-                Paragraph(h.grade.libelle if h.grade else "—", styles["PaslCellValue"]),
-            ])
-        table_hist = Table(
-            lignes,
-            colWidths=[22 * mm, 20 * mm, 20 * mm, 40 * mm, 55 * mm, 23 * mm],
-            repeatRows=1,
-        )
-        table_hist.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), COULEUR_PRIMAIRE),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("GRID", (0, 0), (-1, -1), 0.25, COULEUR_BORDURE),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, COULEUR_FOND_ALT]),
-        ]))
-        elements.append(table_hist)
-        elements.append(Spacer(1, 4 * mm))
+    # ---------- 1. État civil ----------
+    naissance = _d(employe.date_naissance)
+    if getattr(employe, "lieu_naissance", None):
+        naissance += f" à {employe.lieu_naissance}"
+    if ctx.get("age") is not None:
+        naissance += f" ({ctx['age']} ans)"
+    situation = employe.statut_matrimonial or ""
+    if employe.nombre_enfants is not None:
+        situation += (" · " if situation else "") + f"{employe.nombre_enfants} enfant{'s' if employe.nombre_enfants > 1 else ''}"
+    cni = getattr(employe, "numero_cni", None)
+    if cni and getattr(employe, "cni_delivree_le", None):
+        cni += f" du {_d(employe.cni_delivree_le)}"
+    el += _section("1. État civil", st)
+    el.append(_grille([
+        ("Nom", employe.nom), ("Prénom(s)", employe.prenom), ("Genre", "Femme" if employe.genre == "F" else "Homme"),
+        ("Date et lieu de naissance", naissance if employe.date_naissance else None), ("Nationalité", getattr(employe, "nationalite", None)),
+        ("Situation familiale", situation or None),
+        ("N° de CNI", cni), ("Niveau d'études / diplôme", getattr(employe, "niveau_etudes", None)), ("", ""),
+    ], st))
 
-    # --- Suivi disciplinaire ---
+    # ---------- 2. Coordonnées ----------
+    urgence = " · ".join(x for x in [employe.contact_urgence_nom, employe.contact_urgence_tel] if x) or None
+    el += _section("2. Coordonnées", st)
+    el.append(_grille([
+        ("Adresse (quartier, ville)", getattr(employe, "adresse", None)), ("Téléphone professionnel", employe.telephone_pro),
+        ("Téléphone personnel", employe.telephone_perso),
+        ("Email professionnel", employe.email_pro), ("Email personnel", employe.email_perso), ("Contact d'urgence", urgence),
+    ], st))
+
+    # ---------- 3. Situation professionnelle ----------
+    n1 = ctx.get("n_plus_1")
+    el += _section("3. Situation professionnelle", st)
+    el.append(_grille([
+        ("Matricule", employe.matricule), ("N° CNPS", getattr(employe, "numero_cnps", None)), ("Date d'embauche", _d(employe.date_embauche)),
+        ("Poste", employe.poste.intitule if employe.poste else None), ("Grade", employe.grade.libelle if employe.grade else None),
+        ("Supérieur hiérarchique (N+1)", f"{n1.nom} {n1.prenom}" if n1 else None),
+        ("Département", employe.departement.nom if employe.departement else None),
+        ("Agence", employe.agence.nom if employe.agence else "Direction Générale"),
+        ("Départ à la retraite (60 ans)", _d(ctx.get("date_retraite")) if ctx.get("date_retraite") else None),
+    ], st))
+
+    # ---------- 4. Parcours ----------
+    hist = ctx.get("historique") or []
+    el += _section("4. Parcours dans l'entreprise", st)
+    if hist:
+        el.append(_tableau(["Mouvement", "Période", "Poste", "Affectation", "Grade"], [[
+            (h.type_mouvement or "—").replace("_", " ").capitalize(),
+            f"{_d(h.date_debut)} → {_d(h.date_fin) if h.date_fin else 'en cours'}",
+            h.poste.intitule if h.poste else "—",
+            (h.departement.nom if h.departement else "—") + (f" / {h.agence.nom}" if h.agence else ""),
+            h.grade.libelle if h.grade else "—",
+        ] for h in hist], [26 * mm, 40 * mm, 38 * mm, 50 * mm, 26 * mm], st))
+    else:
+        el.append(Paragraph("Aucun mouvement enregistré.", st["FVide"]))
+
+    # ---------- 5. Congés et absences ----------
+    s = ctx["solde"]
+    bloc_conges = _section("5. Congés et absences", st)
+    bloc_conges.append(ParagraphBalise(
+        f"Droits acquis depuis l'embauche : <b>{_nb(s['total_alloue'])} j</b> (2 j/mois) &nbsp;·&nbsp; "
+        f"Pris : <b>{_nb(s['total_pris'])} j</b> &nbsp;·&nbsp; Disponibles : <b>{_nb(s['total_restant'])} j</b>", st["FCell"]))
+    bloc_conges.append(Spacer(1, 2 * mm))
+    absences = (ctx.get("absences") or [])[:8]
+    if absences:
+        bloc_conges.append(_tableau(["Type", "Du", "Au", "Durée", "Justifiée"], [[
+            a.type_absence.libelle if a.type_absence else "—", _d(a.date_debut), _d(a.date_fin),
+            f"{nb_jours_ouvrables(a.date_debut, a.date_fin)} j", "Oui" if a.justifiee else "Non",
+        ] for a in absences], [60 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm], st))
+        bloc_conges.append(Paragraph("8 dernières absences au maximum.", st["FPetit"]))
+    el.append(KeepTogether(bloc_conges))
+
+    # ---------- 6. Discipline ----------
+    sanctions = ctx.get("sanctions") or []
+    bloc_disc = _section("6. Suivi disciplinaire", st)
     if sanctions:
-        elements.append(Paragraph("Suivi disciplinaire", styles["PaslSection"]))
-        lignes_s = [[
-            Paragraph("Date", styles["PaslCellHeader"]),
-            Paragraph("Type", styles["PaslCellHeader"]),
-            Paragraph("Motif", styles["PaslCellHeader"]),
-            Paragraph("Durée", styles["PaslCellHeader"]),
-        ]]
-        for s in sanctions:
-            import re as _re
-            motif_clean = s.motif or "—"
-            # Supprime les liens Markdown [texte](url) → garde "texte"
-            motif_clean = _re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', motif_clean)
-            # Supprime les liens Markdown incomplets [n] ou [n] (
-            motif_clean = _re.sub(r'\[\d+\]\s*\(?', '', motif_clean)
-            # Supprime toute URL résiduelle
-            motif_clean = _re.sub(r'https?://\S+', '', motif_clean)
-            # Supprime les parenthèses orphelines et espaces en trop
-            motif_clean = _re.sub(r'\s*\(\s*\)', '', motif_clean)
-            motif_clean = _re.sub(r'\s+', ' ', motif_clean).strip()
+        bloc_disc.append(_tableau(["Date", "Sanction", "Motif", "Durée"], [[
+            _d(x.date_sanction), x.type_sanction or "—", x.motif or "—", x.duree or "—",
+        ] for x in sanctions], [24 * mm, 42 * mm, 94 * mm, 20 * mm], st))
+    else:
+        bloc_disc.append(Paragraph("Aucune sanction enregistrée.", st["FCell"]))
+    el.append(KeepTogether(bloc_disc))
 
-            lignes_s.append([
-                Paragraph(s.date_sanction.strftime("%d/%m/%Y") if s.date_sanction else "—", styles["PaslCellValue"]),
-                Paragraph(s.type_sanction or "—", styles["PaslCellValue"]),
-                Paragraph(motif_clean or "—", styles["PaslCellValue"]),
-                Paragraph(s.duree or "—", styles["PaslCellValue"]),
-            ])
-        table_s = Table(lignes_s, colWidths=[25 * mm, 40 * mm, 95 * mm, 20 * mm], repeatRows=1)
-        table_s.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#9B2C2C")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("GRID", (0, 0), (-1, -1), 0.25, COULEUR_BORDURE),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FFF5F5")]),
-        ]))
-        elements.append(table_s)
-        elements.append(Spacer(1, 4 * mm))
+    # ---------- 7. Pièces du dossier ----------
+    bloc_p = _section("7. Pièces du dossier", st)
+    pieces = ctx.get("pieces") or []
+    bloc_p.append(Table([[ParagraphBalise(
+        f"{_e(lib)} : <font color='{'#166534' if ok else '#975a16'}'><b>{'fourni' if ok else 'MANQUANT'}</b></font>", st["FCell"]) for lib, ok in pieces]],
+        colWidths=[LARGEUR / max(len(pieces), 1)] * max(len(pieces), 1)))
+    el.append(KeepTogether(bloc_p))
 
-    # --- Congés ---
-    if soldes_conges:
-        COULEUR_CONGE_TITRE = colors.HexColor("#5F9B2E")  # vert PASL foncé (lisible)
-        style_conge = ParagraphStyle(
-            name="PaslSectionConge",
-            parent=styles["PaslSection"],
-            textColor=COULEUR_CONGE_TITRE,
-        )
-        elements.append(Paragraph("Congés", style_conge))
+    # ---------- Signatures ----------
+    el.append(Spacer(1, 6 * mm))
+    sig = Table([
+        [Paragraph("Je certifie l'exactitude des informations ci-dessus.", st["FPetit"]), ""],
+        [ParagraphBalise("<b>L'employé(e)</b> — date et signature", st["FCell"]), ParagraphBalise("<b>Le service des Ressources Humaines</b> — date, signature et cachet", st["FCell"])],
+        ["", ""],
+    ], colWidths=[90 * mm, 90 * mm], rowHeights=[None, None, 20 * mm])
+    sig.setStyle(TableStyle([
+        ("SPAN", (0, 0), (1, 0)), ("BOX", (0, 1), (0, 2), 0.3, COULEUR_BORDURE), ("BOX", (1, 1), (1, 2), 0.3, COULEUR_BORDURE),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"), ("TOPPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    el.append(KeepTogether(sig))
 
-        total_alloue = soldes_conges.get("total_alloue", 0)
-        total_pris = soldes_conges.get("total_pris", 0)
-        total_restant = soldes_conges.get("total_restant", 0)
-        annees_comptees = soldes_conges.get("annees_comptees", 0)
-
-        recap_data = [
-            [
-                ParagraphBalise("<b>Alloués (cumul)</b>", styles["PaslCellValue"]),
-                ParagraphBalise("<b>Pris</b>", styles["PaslCellValue"]),
-                ParagraphBalise("<b>Restants</b>", styles["PaslCellValue"]),
-                ParagraphBalise("<b>Ancienneté</b>", styles["PaslCellValue"]),
-            ],
-            [
-                Paragraph(f"{total_alloue}j", styles["PaslCellValue"]),
-                Paragraph(f"{total_pris}j", styles["PaslCellValue"]),
-                Paragraph(f"{total_restant}j", styles["PaslCellValue"]),
-                Paragraph(f"{annees_comptees} an(s)", styles["PaslCellValue"]),
-            ],
-        ]
-        table_recap = Table(recap_data, colWidths=[45 * mm, 45 * mm, 45 * mm, 45 * mm])
-        COULEUR_CONGE_FOND = colors.HexColor("#6BA534")  # vert PASL (fond tableau)
-        table_recap.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), COULEUR_CONGE_FOND),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("GRID", (0, 0), (-1, -1), 0.25, COULEUR_BORDURE),
-        ]))
-        elements.append(table_recap)
-        elements.append(Spacer(1, 3 * mm))
-
-        conges_pris = soldes_conges.get("conges_pris", [])
-        if conges_pris:
-            lignes_c = [[
-                Paragraph("Du", styles["PaslCellHeader"]),
-                Paragraph("Au", styles["PaslCellHeader"]),
-                Paragraph("Durée", styles["PaslCellHeader"]),
-                Paragraph("Motif", styles["PaslCellHeader"]),
-            ]]
-            for c in conges_pris:
-                duree = nb_jours_ouvrables(c.date_debut, c.date_fin)  # [CORRECTIF B9] jours ouvrables
-                lignes_c.append([
-                    Paragraph(c.date_debut.strftime("%d/%m/%Y") if c.date_debut else "—", styles["PaslCellValue"]),
-                    Paragraph(c.date_fin.strftime("%d/%m/%Y") if c.date_fin else "—", styles["PaslCellValue"]),
-                    Paragraph(f"{duree}j", styles["PaslCellValue"]),
-                    Paragraph(c.motif or "—", styles["PaslCellValue"]),
-                ])
-            table_c = Table(lignes_c, colWidths=[30 * mm, 30 * mm, 20 * mm, 100 * mm], repeatRows=1)
-            table_c.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), COULEUR_CONGE_FOND),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-                ("TOPPADDING", (0, 0), (-1, -1), 3),
-                ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-                ("GRID", (0, 0), (-1, -1), 0.25, COULEUR_BORDURE),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, COULEUR_FOND_ALT]),
-            ]))
-            elements.append(table_c)
-
-    doc.build(elements, onFirstPage=_pied_de_page, onLaterPages=_pied_de_page)
+    doc.build(el, onFirstPage=_pied_de_page, onLaterPages=_pied_de_page, canvasmaker=_CanevasNumerote)
     buffer.seek(0)
     return buffer.read()
 

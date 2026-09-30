@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <title>Connexion — Système RH</title>
   <link rel="icon" type="image/png" href="/static/favicon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/vendor/polices.css">
 <style>
   .material-symbols-outlined {
     font-family: 'Material Symbols Outlined';
@@ -25,16 +23,9 @@
   }
   ::-webkit-scrollbar { display: none; }
 </style>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { theme: { extend: { colors: {
-      "primary": "#003c59", "primary-container": "#06547a", "secondary": "#1a6682",
-      "surface": "#f9f9ff", "surface-container-lowest": "#ffffff", "surface-container": "#e7eefe",
-      "surface-container-low": "#f0f3ff", "surface-container-high": "#e2e8f8",
-      "on-surface": "#151c27", "on-surface-variant": "#41484e", "outline": "#71787f",
-      "error": "#ba1a1a", "error-container": "#ffdad6"
-    }, fontFamily: { sans: ["Inter", "sans-serif"] } } } };
-  </script>
+  <!-- Point 8 : styles, icônes et polices embarqués (aucune dépendance à Internet).
+       tailwind.css se régénère avec outils_front/construire_css.bat -->
+  <link rel="stylesheet" href="/static/vendor/tailwind.css">
 </head>
 <body class="bg-surface font-sans text-[14px] text-on-surface antialiased min-h-screen flex items-center justify-center p-4">
   <main class="w-full max-w-md">
@@ -62,10 +53,10 @@
       <form method="post" action="/login" class="space-y-4">
         {{ csrf_input(request) }}
         <div>
-          <label class="block text-[13px] font-medium text-on-surface mb-1" for="email">Adresse email professionnelle</label>
+          <label class="block text-[13px] font-medium text-on-surface mb-1" for="email">Email ou matricule</label>
           <div class="relative flex items-center">
             <span class="material-symbols-outlined absolute left-3 text-outline pointer-events-none text-[18px]">mail</span>
-            <input class="w-full h-11 pl-10 pr-4 bg-surface-container-lowest text-on-surface text-[14px] rounded-lg shadow-sm border border-surface-container-high placeholder:text-outline focus:outline-none focus:bg-surface-container-low transition-colors" id="email" name="email" placeholder="nom@panafricansl.cm" required type="email">
+            <input class="w-full h-11 pl-10 pr-4 bg-surface-container-lowest text-on-surface text-[14px] rounded-lg shadow-sm border border-surface-container-high placeholder:text-outline focus:outline-none focus:bg-surface-container-low transition-colors" id="email" name="email" placeholder="ex. nom@panafricansl.cm ou votre matricule" required type="text" autocomplete="username" autofocus>
           </div>
         </div>
         <div>

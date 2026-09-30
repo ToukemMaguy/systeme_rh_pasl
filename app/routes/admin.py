@@ -2,7 +2,9 @@
 from datetime import datetime, timedelta
 from urllib.parse import quote
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
-from fastapi.responses import RedirectResponse
+from io import BytesIO
+from fastapi.responses import RedirectResponse, Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from ..database import get_db
@@ -46,7 +48,103 @@ def _page_utilisateurs(request: Request, db: Session, mot_de_passe_provisoire: d
         "maintenant": datetime.now(),
         "longueur_min": LONGUEUR_MIN_MDP,
         "mot_de_passe_provisoire": mot_de_passe_provisoire,
+        # [PRODUCTION - POINT 3] employés actifs sans compte (création en une fois)
+        "nb_sans_compte": len(employes_disponibles),
     })
+
+
+# ------------------------------------------------------------------
+# [PRODUCTION - POINT 3] Création en une fois des comptes de tous les employés actifs
+# ------------------------------------------------------------------
+def _choisir_identifiant(employe, deja_pris: set[str]) -> str | None:
+    """Identifiant de connexion : email pro, sinon email perso, sinon matricule (décision PASL).
+    Un identifiant déjà utilisé par un autre compte est sauté."""
+    for candidat in (employe.email_pro, employe.email_perso, employe.matricule):
+        candidat = (candidat or "").strip()
+        if candidat and candidat.lower() not in deja_pris:
+            return candidat
+    return None
+
+
+@router.post("/admin/utilisateurs/creer-comptes-manquants")
+def creer_comptes_manquants(request: Request, db: Session = Depends(get_db)):
+    """Crée un compte « Employé » pour chaque employé actif qui n'en a pas, puis renvoie un fichier Excel
+    avec les identifiants et mots de passe provisoires à distribuer. Les mots de passe ne sont enregistrés
+    nulle part en clair : ce fichier est le SEUL endroit où ils figurent."""
+    _exiger_admin(request)
+    deja_pris = {e.lower() for (e,) in db.query(models.Utilisateur.email).all()}
+    avec_compte = {i for (i,) in db.query(models.Utilisateur.employe_id).filter(models.Utilisateur.employe_id.isnot(None)).all()}
+    employes = (
+        db.query(models.Employe)
+        .filter(models.Employe.statut == "actif")
+        .order_by(models.Employe.nom, models.Employe.prenom)
+        .all()
+    )
+    crees, ignores = [], []
+    for e in employes:
+        if e.id in avec_compte:
+            continue
+        identifiant = _choisir_identifiant(e, deja_pris)
+        if not identifiant:
+            ignores.append((e, "Ni email ni matricule disponible (ou déjà utilisés par un autre compte)"))
+            continue
+        mdp = generer_mot_de_passe_provisoire()
+        db.add(models.Utilisateur(
+            email=identifiant, nom=f"{e.prenom} {e.nom}", role="Employé", employe_id=e.id,
+            mot_de_passe_hash=auth.hash_password(mdp), doit_changer_mdp=True,
+        ))
+        deja_pris.add(identifiant.lower())
+        crees.append((e, identifiant, mdp))
+    db.commit()
+
+    if not crees and not ignores:
+        return RedirectResponse(url=f"/admin/utilisateurs?ok={quote('Tous les employés actifs ont déjà un compte.')}", status_code=303)
+    if not crees:
+        noms = ", ".join(f"{e.nom} {e.prenom}" for e, _ in ignores[:10])
+        message = (f"Aucun compte créé : {len(ignores)} employé(s) n'ont ni email ni matricule utilisable ({noms}). "
+                   "Complétez leur fiche puis recommencez.")
+        return RedirectResponse(url=f"/admin/utilisateurs?erreur={quote(message)}", status_code=303)
+    return _excel_comptes(crees, ignores)
+
+
+def _excel_comptes(crees, ignores) -> Response:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Comptes créés"
+    ws.append([f"Comptes créés le {datetime.now().strftime('%d/%m/%Y à %H:%M')} — DOCUMENT CONFIDENTIEL : "
+               "à imprimer et distribuer, puis à SUPPRIMER (il contient des mots de passe)."])
+    ws["A1"].font = Font(bold=True, color="9B2C2C")
+    ws.append(["Adresse de l'application : voir l'intranet / le service RH. Connexion avec l'identifiant ci-dessous "
+               "(ou le matricule). Le mot de passe pourra être changé depuis l'icône 🔑 du menu."])
+    ws.append([])
+    entetes = ["Matricule", "Nom", "Prénom", "Agence / Département", "Identifiant de connexion", "Mot de passe provisoire"]
+    ws.append(entetes)
+    for cellule in ws[4]:
+        cellule.font = Font(bold=True, color="FFFFFF")
+        cellule.fill = PatternFill("solid", fgColor="06547A")
+    for e, identifiant, mdp in crees:
+        unite = e.agence.nom if e.agence else (e.departement.nom if e.departement else "")
+        ws.append([e.matricule or "", e.nom, e.prenom, unite, identifiant, mdp])
+    for colonne, largeur in zip("ABCDEF", (14, 22, 22, 28, 34, 24)):
+        ws.column_dimensions[colonne].width = largeur
+    for ligne in ws.iter_rows(min_row=5, min_col=6, max_col=6):
+        for cellule in ligne:
+            cellule.font = Font(name="Consolas", size=12, bold=True)
+    ws.freeze_panes = "A5"
+    if ignores:
+        ws2 = wb.create_sheet("Non créés")
+        ws2.append(["Matricule", "Nom", "Prénom", "Raison"])
+        for e, raison in ignores:
+            ws2.append([e.matricule or "", e.nom, e.prenom, raison])
+        ws2.column_dimensions["D"].width = 70
+    tampon = BytesIO()
+    wb.save(tampon)
+    nom = f"comptes_crees_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return Response(content=tampon.getvalue(),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{nom}"', "Cache-Control": "no-store"})
 
 
 @router.get("/admin/utilisateurs")

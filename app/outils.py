@@ -16,18 +16,61 @@ DOSSIER_UPLOADS = Path("app/static/uploads/employes")
 # OUTILS FICHIERS
 # ============================================================
 
-def _enregistrer_fichier(fichier, employe_id: int, prefixe: str) -> str | None:
-    """Sauvegarde un fichier uploadé et retourne son chemin relatif (ou None si rien envoyé)."""
+# [PRODUCTION - POINT 2] Contrôle des fichiers envoyés. Avant, n'importe quel fichier était accepté et
+# publié tel quel : une page web piégée (.html, .svg) jointe à une demande pouvait agir à la place du
+# collègue RH qui l'ouvrait. On n'accepte plus que des PDF et des images JPG/PNG de 5 Mo maximum,
+# en vérifiant le CONTENU du fichier (signature), pas seulement son extension.
+TAILLE_MAX_FICHIER = 5 * 1024 * 1024
+SIGNATURES = {
+    ".pdf": (b"%PDF",),
+    ".jpg": (b"\xff\xd8\xff",),
+    ".jpeg": (b"\xff\xd8\xff",),
+    ".png": (b"\x89PNG\r\n\x1a\n",),
+}
+EXTENSIONS_IMAGES = {".jpg", ".jpeg", ".png"}
+
+
+class FichierRefuse(Exception):
+    """Fichier envoyé non conforme : le message est affiché tel quel à l'utilisateur."""
+    def __init__(self, message: str):
+        self.message = message
+
+
+def verifier_fichier(fichier, images_seulement: bool = False) -> str | None:
+    """Message d'erreur si le fichier n'est pas acceptable, None s'il est correct (ou absent)."""
     if not fichier or not fichier.filename:
         return None
+    extension = Path(fichier.filename).suffix.lower()
+    autorisees = EXTENSIONS_IMAGES if images_seulement else set(SIGNATURES)
+    formats = "JPG ou PNG" if images_seulement else "PDF, JPG ou PNG"
+    nom = Path(fichier.filename).name
+    if extension not in autorisees:
+        return f"« {nom} » : format non accepté. Formats autorisés : {formats}."
+    contenu = fichier.file.read(TAILLE_MAX_FICHIER + 1)
+    fichier.file.seek(0)
+    if len(contenu) > TAILLE_MAX_FICHIER:
+        return f"« {nom} » dépasse la taille maximale de 5 Mo. Réduisez-le (scan en qualité moyenne) puis réessayez."
+    if not contenu.startswith(SIGNATURES[extension]):
+        return f"« {nom} » n'est pas un vrai fichier {extension[1:].upper()} (fichier renommé ou abîmé)."
+    return None
+
+
+def _enregistrer_fichier(fichier, employe_id: int, prefixe: str) -> str | None:
+    """Sauvegarde un fichier uploadé et retourne son chemin relatif (ou None si rien envoyé).
+    Lève FichierRefuse si le fichier n'est pas conforme (voir verifier_fichier)."""
+    if not fichier or not fichier.filename:
+        return None
+    erreur = verifier_fichier(fichier, images_seulement=(prefixe == "photo"))
+    if erreur:
+        raise FichierRefuse(erreur)
     dossier = DOSSIER_UPLOADS / str(employe_id)
     dossier.mkdir(parents=True, exist_ok=True)
-    extension = Path(fichier.filename).suffix
+    extension = Path(fichier.filename).suffix.lower()
     nom_sur = re.sub(r"[^a-zA-Z0-9_-]", "_", Path(fichier.filename).stem)[:50]
     nom_fichier = f"{prefixe}_{nom_sur}_{uuid.uuid4().hex[:8]}{extension}"
     chemin_disque = dossier / nom_fichier
     with open(chemin_disque, "wb") as f:
-        f.write(fichier.file.read())
+        f.write(fichier.file.read(TAILLE_MAX_FICHIER + 1))
     return f"static/uploads/employes/{employe_id}/{nom_fichier}"
 
 templates = Jinja2Templates(directory="app/templates")

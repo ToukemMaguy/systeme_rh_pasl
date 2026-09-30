@@ -1,0 +1,17 @@
+{# Point 10 : avertissement (non bloquant) si l'absence demandée fait passer l'unité sous son seuil de présence #}
+{% if alerte_presence %}
+<div class="px-4 py-3 rounded-lg bg-[#FFF5F5] text-[#9b2c2c] text-[13px] border border-[#fed7d7]">
+  <div class="flex items-center gap-2 font-semibold">
+    <span class="material-symbols-outlined text-[18px]">group_off</span>
+    Attention : seuil de présence non respecté — {{ alerte_presence.unite }} (minimum {{ alerte_presence.seuil }} agent{{ "s" if alerte_presence.seuil > 1 else "" }} présent{{ "s" if alerte_presence.seuil > 1 else "" }})
+  </div>
+  <ul class="mt-1.5 ml-7 list-disc">
+    {% for j in alerte_presence.jours[:8] %}
+    <li>Le {{ j.jour.strftime("%d/%m/%Y") }} : il ne resterait que <b>{{ j.presents }}</b> présent{{ "s" if j.presents > 1 else "" }} sur {{ j.effectif }}.</li>
+    {% endfor %}
+    {% if alerte_presence.jours | length > 8 %}<li>… et {{ alerte_presence.jours | length - 8 }} autre(s) jour(s).</li>{% endif %}
+  </ul>
+  <div class="mt-1.5 ml-7 text-[12px]">Ce n'est qu'un avertissement : vous pouvez tout de même valider, ou proposer d'autres dates.
+    {% if request.session.get('role') in ('Chef RH', 'Assistant RH') %}<a href="/calendrier?unite={{ alerte_presence.cle }}&mois={{ alerte_presence.jours[0].jour.strftime('%Y-%m') }}" class="underline font-semibold">Voir le calendrier d'équipe</a>{% endif %}</div>
+</div>
+{% endif %}

@@ -1,0 +1,171 @@
+{% extends "_layout.html" %}
+{# Point 10 : calendrier d'équipe et seuil de présence (validé par la RH le 30/09/2026) #}
+{% block title %}{{ titre }}{% endblock %}
+{% block breadcrumb %}{{ titre }}{% endblock %}
+{% block content %}
+{% set carte = "bg-surface-container-lowest rounded-xl shadow-sm" %}
+{% set couleurs = {"Congé": "bg-[#3182ce]", "Permission": "bg-[#d69e2e]", "Absence": "bg-[#e53e3e]"} %}
+{% set legendes = {"Congé": "Congé annuel", "Permission": "Permission", "Absence": "Autre absence"} %}
+{% set param_unite = ("&unite=" ~ unite_cle) if unite_cle else "" %}
+
+<div class="flex flex-col gap-4">
+
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-[22px] font-semibold text-on-surface">{{ titre }}</h1>
+      <p class="text-[13px] text-on-surface-variant mt-0.5">
+        {% if vue_equipe %}Présences et absences de vos collaborateurs directs.
+        {% else %}Présences et absences par agence ou par département de la Direction Générale.{% endif %}
+      </p>
+    </div>
+    {% if jours %}
+    <div class="flex items-center gap-2">
+      <a href="/calendrier?mois={{ mois_precedent }}{{ param_unite }}" class="w-9 h-9 inline-flex items-center justify-center rounded-lg bg-surface-container-high hover:bg-surface-container-highest" title="Mois précédent">
+        <span class="material-symbols-outlined text-[20px]">chevron_left</span></a>
+      <span class="min-w-[150px] text-center text-[15px] font-semibold capitalize">{{ libelle_mois }}</span>
+      <a href="/calendrier?mois={{ mois_suivant }}{{ param_unite }}" class="w-9 h-9 inline-flex items-center justify-center rounded-lg bg-surface-container-high hover:bg-surface-container-highest" title="Mois suivant">
+        <span class="material-symbols-outlined text-[20px]">chevron_right</span></a>
+      <a href="/calendrier?{{ param_unite[1:] }}" class="h-9 px-3 inline-flex items-center rounded-lg text-[13px] text-primary font-medium hover:bg-surface-container">Aujourd'hui</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if request.query_params.get('erreur') %}
+  <div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ request.query_params.get('erreur') }}</div>
+  {% endif %}
+  {% if request.query_params.get('ok') %}
+  <div class="px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px]">{{ request.query_params.get('ok') }}</div>
+  {% endif %}
+
+  {# ---------- Choix de l'unité et seuil ---------- #}
+  {% if not vue_equipe %}
+  <div class="{{ carte }} p-4 flex flex-wrap items-end gap-4">
+    <form method="get" action="/calendrier" class="flex items-end gap-2">
+      <input type="hidden" name="mois" value="{{ '%04d-%02d' % (annee, mois) }}">
+      <div>
+        <label class="block text-[12px] text-on-surface-variant font-medium mb-1" for="unite">Agence ou département</label>
+        <select id="unite" name="unite" onchange="this.form.submit()" class="h-[38px] min-w-[260px] px-3 bg-surface-container-low rounded-lg text-[13px]">
+          {% for groupe in unites | groupby("groupe") | sort(attribute="grouper", reverse=True) %}
+          <optgroup label="{{ groupe.grouper }}">
+            {% for u in groupe.list %}
+            <option value="{{ u.cle }}" {% if u.cle == unite_cle %}selected{% endif %}>{{ u.libelle }}{% if u.seuil %} — min. {{ u.seuil }}{% endif %}</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+      </div>
+      <noscript><button type="submit" class="h-[38px] px-3 rounded-lg bg-surface-container-high text-[13px]">Afficher</button></noscript>
+    </form>
+
+    {% if unite_cle %}
+      {% if est_rh %}
+      <form method="post" action="/calendrier/seuil" class="flex items-end gap-2">
+        {{ csrf_input(request) }}
+        <input type="hidden" name="unite" value="{{ unite_cle }}">
+        <input type="hidden" name="mois" value="{{ '%04d-%02d' % (annee, mois) }}">
+        <div>
+          <label class="block text-[12px] text-on-surface-variant font-medium mb-1" for="seuil">Minimum d'agents présents par jour</label>
+          <input id="seuil" type="number" name="seuil" min="1" max="500" value="{{ seuil or '' }}" placeholder="Aucun"
+                 class="h-[38px] w-[120px] px-3 bg-surface-container-low rounded-lg text-[13px]">
+        </div>
+        <button type="submit" class="h-[38px] px-4 rounded-lg bg-primary-container text-white text-[13px] font-semibold">Enregistrer</button>
+      </form>
+      {% else %}
+      <div class="text-[13px] text-on-surface-variant">Seuil de présence : <b class="text-on-surface">{{ ("au moins " ~ seuil ~ " agent(s)") if seuil else "aucun" }}</b></div>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ---------- Résumé ---------- #}
+  {% if seuil and nb_jours_sous_seuil %}
+  <div class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#FFF5F5] text-[#9b2c2c] text-[13px]">
+    <span class="material-symbols-outlined text-[18px]">warning</span>
+    <span><b>{{ nb_jours_sous_seuil }} jour{{ "s" if nb_jours_sous_seuil > 1 else "" }} sous le seuil</b> en {{ libelle_mois }}
+      (minimum {{ seuil }} agent{{ "s" if seuil > 1 else "" }} présent{{ "s" if seuil > 1 else "" }}) : voir les cases rouges en bas du tableau.</span>
+  </div>
+  {% elif seuil %}
+  <div class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px]">
+    <span class="material-symbols-outlined text-[18px]">check_circle</span>
+    <span>Seuil respecté tous les jours ouvrables de {{ libelle_mois }}.</span>
+  </div>
+  {% endif %}
+
+  {# ---------- Tableau ---------- #}
+  <div class="{{ carte }} overflow-hidden">
+    {% if not lignes %}
+    <p class="p-6 text-[13px] text-on-surface-variant">Aucun employé actif dans cette {{ "équipe" if vue_equipe else "unité" }}.</p>
+    {% else %}
+    <div class="overflow-x-auto">
+      <table class="border-collapse text-[12px]">
+        <thead>
+          <tr class="bg-surface-container-low">
+            <th class="sticky left-0 z-10 bg-surface-container-low text-left px-3 py-2 min-w-[210px] text-[11.5px] uppercase text-on-surface-variant">Employé</th>
+            {% for j in jours %}
+            {% set ferme = j.weekday() == 6 or j in feries %}
+            <th class="w-[30px] min-w-[30px] py-1 text-center font-semibold {{ 'text-outline' if ferme else 'text-on-surface-variant' }} {{ 'bg-[#dbeafe] text-primary' if j == aujourdhui else '' }}"
+                title="{{ 'Jour férié' if j in feries else '' }}">
+              <div class="text-[10px]">{{ jours_fr[j.weekday()] }}</div>
+              <div>{{ j.day }}</div>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in lignes %}
+          <tr class="border-t border-surface-container">
+            <td class="sticky left-0 z-10 bg-surface-container-lowest px-3 py-1.5 whitespace-nowrap">
+              {% if not vue_equipe %}<a href="/employes/{{ l.employe.id }}" class="font-medium text-on-surface hover:text-primary hover:underline">{% else %}<span class="font-medium">{% endif %}
+                {{ l.employe.nom }} {{ l.employe.prenom }}
+              {% if not vue_equipe %}</a>{% else %}</span>{% endif %}
+              <div class="text-[11px] text-on-surface-variant">{{ l.employe.poste.intitule if l.employe.poste else "" }}</div>
+            </td>
+            {% for c in l.cases %}
+            {% if c.etat == "absent" %}
+            <td class="p-[3px]" title="{{ c.libelle }} — {{ jours[loop.index0].strftime('%d/%m') }}">
+              {% if est_rh %}<a href="/absences/{{ c.absence_id }}" class="block">{% endif %}
+              <div class="h-[22px] rounded {{ couleurs.get(c.categorie, 'bg-[#718096]') }}"></div>
+              {% if est_rh %}</a>{% endif %}
+            </td>
+            {% elif c.etat == "ferme" %}
+            <td class="p-[3px] bg-surface-container-low"></td>
+            {% elif c.etat == "hors" %}
+            <td class="p-[3px]" title="Hors effectif"><div class="h-[22px] rounded bg-[repeating-linear-gradient(45deg,#edf2f7,#edf2f7_3px,#fff_3px,#fff_6px)]"></div></td>
+            {% else %}
+            <td class="p-[3px]"><div class="h-[22px] rounded bg-[#F0FDF4] border border-[#dcfce7]"></div></td>
+            {% endif %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="border-t-2 border-surface-container-high bg-surface-container-low">
+            <td class="sticky left-0 z-10 bg-surface-container-low px-3 py-2 text-[11.5px] font-semibold uppercase text-on-surface-variant">
+              Présents{% if seuil %} (min. {{ seuil }}){% endif %}
+            </td>
+            {% for t in totaux %}
+            {% if t is none %}
+            <td></td>
+            {% else %}
+            <td class="text-center py-1.5 font-bold {{ 'bg-[#fed7d7] text-[#9b2c2c]' if t.sous_seuil else 'text-on-surface' }}"
+                title="{{ t.presents }} présent(s) sur {{ t.effectif }}">{{ t.presents }}</td>
+            {% endif %}
+            {% endfor %}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ---------- Légende ---------- #}
+  <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-on-surface-variant">
+    <span class="inline-flex items-center gap-1.5"><span class="w-4 h-3 rounded bg-[#F0FDF4] border border-[#dcfce7]"></span>Présent</span>
+    {% for libelle, classe in couleurs.items() %}
+    <span class="inline-flex items-center gap-1.5"><span class="w-4 h-3 rounded {{ classe }}"></span>{{ legendes[libelle] }}</span>
+    {% endfor %}
+    <span class="inline-flex items-center gap-1.5"><span class="w-4 h-3 rounded bg-surface-container-low border border-surface-container-high"></span>Dimanche / férié</span>
+    <span class="inline-flex items-center gap-1.5"><span class="w-4 h-3 rounded bg-[repeating-linear-gradient(45deg,#edf2f7,#edf2f7_3px,#fff_3px,#fff_6px)] border border-surface-container-high"></span>Hors effectif</span>
+  </div>
+</div>
+{% endblock %}

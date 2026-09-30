@@ -2,6 +2,7 @@
 from datetime import datetime
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import RedirectResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import models
@@ -24,9 +25,26 @@ def page_connexion(request: Request):
     return templates.TemplateResponse(request, "login.html", {"erreur": None})
 
 
+def trouver_compte(db: Session, identifiant: str):
+    """[PRODUCTION - POINT 3] Connexion avec l'email du compte OU le matricule de l'employé.
+    Tous les employés n'ont pas d'email professionnel, mais tous ont un matricule.
+    Majuscules / minuscules et espaces autour sont ignorés."""
+    identifiant = (identifiant or "").strip().lower()
+    if not identifiant:
+        return None
+    compte = db.query(models.Utilisateur).filter(func.lower(models.Utilisateur.email) == identifiant).first()
+    if compte:
+        return compte
+    employe = db.query(models.Employe).filter(func.lower(models.Employe.matricule) == identifiant).first()
+    if employe:
+        return db.query(models.Utilisateur).filter_by(employe_id=employe.id).first()
+    return None
+
+
 @router.post("/login")
 def connexion(request: Request, db: Session = Depends(get_db), email: str = Form(...), mot_de_passe: str = Form(...)):
-    utilisateur = db.query(models.Utilisateur).filter_by(email=email.strip()).first()
+    # Le champ s'appelle toujours « email » dans le formulaire, mais accepte aussi le matricule
+    utilisateur = trouver_compte(db, email)
     maintenant = datetime.now()
     ip = request.client.host if request.client else None
     if utilisateur:

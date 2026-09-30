@@ -7,7 +7,7 @@ from ..database import get_db
 from .. import models
 from .. import pdf as pdf_module
 from ..outils import _acces_refuse, _email_valide, _enregistrer_fichier, _entier_ou_none, _valider_saisies_employe, templates
-from ..regles_rh import QUOTA_CONGES_PAR_MOIS, _age_annees, _anciennete, _historique_employe, _solde_conges
+from ..regles_rh import QUOTA_CONGES_PAR_MOIS, contexte_fiche_pdf, _age_annees, _anciennete, _historique_employe, _solde_conges
 
 router = APIRouter()
 
@@ -72,30 +72,7 @@ def mes_infos_pdf(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Aucune fiche employé rattachée à ce compte.")
 
     employe = db.query(models.Employe).get(utilisateur.employe_id)
-    historique = _historique_employe(db, employe.id)
-    sanctions = (
-        db.query(models.Sanction)
-        .filter_by(employe_id=employe.id)
-        .order_by(models.Sanction.date_sanction.desc())
-        .all()
-    )
-
-    # [CORRECTIF B3] Solde calculé par la fonction commune (avant : « années × 18 »)
-    solde = _solde_conges(db, employe)
-
-    type_conge = db.query(models.TypeAbsence).filter(models.TypeAbsence.libelle.ilike("%ongé%")).first()
-    conges_pris = []
-    if type_conge:
-        conges_pris = (
-            db.query(models.Absence)
-            .filter_by(employe_id=employe.id, type_absence_id=type_conge.id)
-            .order_by(models.Absence.date_debut.desc())
-            .all()
-        )
-
-    soldes_conges = {**solde, "conges_pris": conges_pris}
-
-    contenu = pdf_module.generer_fiche_employe_pdf(employe, historique, sanctions, soldes_conges)
+    contenu = pdf_module.generer_fiche_employe_pdf(employe, contexte_fiche_pdf(db, employe, request.session.get("nom")))
     nom_fichier = f"ma_fiche_{employe.matricule or employe.id}_{employe.nom}_{employe.prenom}.pdf".replace(" ", "_")
 
     return Response(

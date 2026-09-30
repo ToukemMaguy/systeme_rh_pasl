@@ -17,6 +17,8 @@
     </p>
   </div>
 
+  {% include "_alerte_presence.html" %}
+
   {% if erreur %}
   <div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ erreur }}</div>
   {% endif %}

@@ -518,6 +518,149 @@ check("Fiche : onglet documents compte les pièces manquantes", "Manquant" in rh
 check("Fiche Comité : pas de bouton d'ajout de sanction", "sanctions/nouvelle" not in comite.get(f"/employes/{F_ID}?onglet=disciplinaire").text)
 check("Fiche : dernière connexion lue dans le journal", "dernière connexion le" in rh.get(f"/employes/{CHEF_ID}").text)
 
+# ================= Point 10 : calendrier d'équipe et seuil de présence =================
+from app import presence as PR
+emp_dg = db.get(models.Employe, EMP_ID)
+check("Seuil : unité d'un agent DG = son département", PR.unite_de(emp_dg) == ("departement", emp_dg.departement_id))
+ag_t = models.Agence(nom="Agence Test Akwa"); db.add(ag_t); db.flush()
+emp_ag = models.Employe(nom="EKANI", prenom="Joël", genre="H", date_embauche=date(2019, 1, 1), departement_id=1, poste_id=1, grade_id=1, agence_id=ag_t.id)
+db.add(emp_ag); db.commit()
+check("Seuil : unité d'un agent d'agence = son agence", PR.unite_de(emp_ag) == ("agence", ag_t.id))
+check("Seuil : un agent d'agence n'est pas compté dans le département DG",
+      emp_ag.id not in [e.id for e in PR.employes_de_unite(db, ("departement", 1))])
+lundi = date.today() + timedelta(days=(7 - date.today().weekday()) % 7 or 7)   # lundi prochain
+while lundi in PR.jours_feries(lundi.year):
+    lundi += timedelta(days=7)
+dimanche = lundi - timedelta(days=1)
+check("Seuil : aucun contrôle tant que la RH n'a pas fixé de seuil", PR.alertes_seuil(db, emp_dg, lundi, lundi) is None)
+r = rh.post("/calendrier/seuil", data={"unite": "departement-1", "mois": "", "seuil": "abc"})
+check("Seuil : valeur non numérique refusée", "erreur=" in r.headers.get("location", ""))
+effectif_dg = len(PR.employes_de_unite(db, ("departement", 1)))
+rh.post("/calendrier/seuil", data={"unite": "departement-1", "mois": "", "seuil": str(effectif_dg)})
+db.expire_all()
+check("Seuil : enregistré par la RH (en nombre d'agents)", db.get(models.Departement, 1).seuil_presence_min == effectif_dg)
+alerte = PR.alertes_seuil(db, db.get(models.Employe, EMP_ID), lundi, lundi)
+check("Seuil : absence un jour ouvrable → alerte", alerte is not None and alerte["jours"][0]["presents"] == effectif_dg - 1, str(alerte))
+check("Seuil : pas de contrôle le dimanche", PR.alertes_seuil(db, db.get(models.Employe, EMP_ID), dimanche, dimanche) is None)
+check("Seuil : le Comité ne peut pas modifier le seuil",
+      comite.post("/calendrier/seuil", data={"unite": "departement-1", "seuil": "1"}).status_code in (302, 303, 307)
+      and (db.expire_all() or db.get(models.Departement, 1).seuil_presence_min == effectif_dg))
+d_seuil = models.DemandeRh(type_demande_id=T["Congé"], employe_concerne_id=EMP_ID, demandeur_id=U_RH, statut="en_attente_rh",
+                           avis_n_plus_1="favorable", periode_sollicitee_debut=lundi, periode_sollicitee_fin=lundi)
+db.add(d_seuil); db.commit()
+check("Seuil : avertissement affiché à la RH avant validation", "seuil de présence non respecté" in rh.get(f"/demandes/{d_seuil.id}/traiter-rh").text)
+r = rh.get("/calendrier?unite=departement-1&mois=" + lundi.strftime("%Y-%m"))
+check("Calendrier RH : page affichée avec le total des présents", r.status_code == 200 and "Présents" in r.text and "min. " in r.text)
+check("Calendrier RH : agence sélectionnable", rh.get(f"/calendrier?unite=agence-{ag_t.id}").status_code == 200)
+check("Calendrier RH : paramètres invalides tolérés", rh.get("/calendrier?unite=xyz&mois=2026-13").status_code == 200)
+check("Calendrier Comité : lecture seule", "calendrier/seuil" not in comite.get("/calendrier?unite=departement-1").text)
+chef_n1 = client("chef@t.cm")
+r = chef_n1.get("/calendrier")
+check("Calendrier N+1 : son équipe uniquement", r.status_code == 200 and "Calendrier de mon équipe" in r.text and "EKANI" not in r.text)
+check("Menu N+1 : lien « Calendrier de mon équipe »", "Calendrier de mon équipe" in chef_n1.get("/espace").text)
+db.get(models.Departement, 1).seuil_presence_min = None; db.commit()
+
+# ================= Fiche signalétique : 6 nouveaux champs + PDF =================
+base = {"nom": "TCHOUA", "prenom": "Luc & Fils", "genre": "H", "date_embauche": "2020-02-01", "date_naissance": "1985-04-02",
+        "departement_id": "1", "poste_id": "1", "grade_id": "1"}
+signal = {"lieu_naissance": "Bafoussam", "nationalite": "Camerounaise", "numero_cni": "CNI-778899", "cni_delivree_le": "2019-06-03",
+          "adresse": "Bonamoussadi, Douala", "numero_cnps": "309-1234567-A", "niveau_etudes": "Master <finance>"}
+r = rh.post("/employes/nouveau", data={**base, **signal, "cni_delivree_le": "2999-01-01"})
+check("Signalétique : CNI délivrée dans le futur refusée", r.status_code == 400 and "futur" in r.text and "Bafoussam" in r.text)
+rh.post("/employes/nouveau", data={**base, **signal})
+db.expire_all()
+t_emp = db.query(models.Employe).filter_by(nom="TCHOUA").first()
+check("Signalétique : 7 valeurs enregistrées à la création", t_emp is not None and t_emp.numero_cnps == "309-1234567-A"
+      and t_emp.cni_delivree_le == date(2019, 6, 3) and t_emp.lieu_naissance == "Bafoussam")
+T_ID = t_emp.id
+check("Signalétique : valeurs pré-remplies en modification", "CNI-778899" in rh.get(f"/employes/{T_ID}/modifier").text)
+rh.post(f"/employes/{T_ID}", data={**base, **signal, "adresse": "Akwa, Douala", "numero_cni": ""})
+db.expire_all(); t_emp = db.get(models.Employe, T_ID)
+check("Signalétique : modification et effacement d'un champ", t_emp.adresse == "Akwa, Douala" and t_emp.numero_cni is None
+      and t_emp.numero_cnps == "309-1234567-A")
+check("Signalétique : champs affichés sur la fiche écran", all(x in rh.get(f"/employes/{T_ID}").text for x in ["Bafoussam", "309-1234567-A", "Akwa, Douala"]))
+r = rh.get(f"/employes/{T_ID}/pdf/fiche")
+check("Fiche PDF : générée sans photo, avec « & » et « < » dans les données", r.status_code == 200 and r.content[:4] == b"%PDF", f"HTTP {r.status_code}")
+r = rh.get(f"/employes/{LIC_EMP}/pdf/fiche")
+check("Fiche PDF : employé licencié (sanctions, parcours)", r.status_code == 200 and r.content[:4] == b"%PDF")
+
+# ================= Mise en production : points 2 à 8 =================
+import io as _io
+from urllib.parse import unquote
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 100
+fiche_base = {"nom": "ZOA", "prenom": "Test", "genre": "F", "date_embauche": "2021-01-04", "departement_id": "1", "poste_id": "1", "grade_id": "1"}
+# Point 2 : fichiers envoyés
+r = rh.post("/employes/nouveau", data=fiche_base, files={"cni": ("cni.html", b"<script>alert(1)</script>", "text/html")})
+check("Fichiers : .html refusé (formulaire réaffiché avec le message)", r.status_code == 400 and "format non accepté" in r.text)
+check("Fichiers : aucun employé créé quand le fichier est refusé", db.query(models.Employe).filter_by(nom="ZOA").count() == 0)
+r = rh.post("/employes/nouveau", data=fiche_base, files={"cni": ("cni.pdf", b"<html>faux pdf</html>", "application/pdf")})
+check("Fichiers : faux PDF (fichier renommé) refusé", r.status_code == 400 and "pas un vrai fichier" in r.text)
+r = rh.post("/employes/nouveau", data=fiche_base, files={"cni": ("cni.pdf", b"%PDF" + b"0" * (5 * 1024 * 1024), "application/pdf")})
+check("Fichiers : plus de 5 Mo refusé", r.status_code == 400 and "5 Mo" in r.text)
+r = rh.post("/employes/nouveau", data=fiche_base, files={"photo": ("photo.pdf", b"%PDF-1.4", "application/pdf")})
+check("Fichiers : photo en PDF refusée (JPG ou PNG seulement)", r.status_code == 400 and "JPG ou PNG" in r.text)
+rh.post("/employes/nouveau", data=fiche_base, files={"photo": ("photo.PNG", PNG, "image/png"), "cni": ("cni.pdf", b"%PDF-1.4 ok", "application/pdf")})
+db.expire_all(); zoa = db.query(models.Employe).filter_by(nom="ZOA").first()
+check("Fichiers : PNG et PDF valides acceptés", zoa is not None and zoa.photo_path and zoa.photo_path.endswith(".png") and zoa.cni_path.endswith(".pdf"))
+abs_z = models.Absence(employe_id=zoa.id, type_absence_id=db.query(models.TypeAbsence).first().id, date_debut=date(2026, 3, 2), date_fin=date(2026, 3, 2))
+db.add(abs_z); db.commit()
+r = rh.post(f"/absences/{abs_z.id}/justificatif", files={"fichier": ("x.svg", b"<svg onload=alert(1)>", "image/svg+xml")})
+check("Fichiers : justificatif .svg refusé avec une page claire", r.status_code == 400 and "Fichier refusé" in r.text)
+# Point 4 : pages d'erreur en français + point 7 : pages techniques fermées + en-têtes de sécurité
+r = rh.get("/cette-page-n-existe-pas")
+check("Erreurs : page 404 en français", r.status_code == 404 and "Page introuvable" in r.text)
+check("Erreurs : fiche inexistante → page claire", rh.get("/employes/999999").status_code == 404)
+r = rh.post("/employes/nouveau", data={"nom": "X"})
+check("Erreurs : formulaire incomplet → page claire (et non du JSON en anglais)", r.status_code == 400 and "Formulaire incomplet" in r.text)
+check("Production : /docs et /openapi.json fermés", rh.get("/docs").status_code == 404 and rh.get("/openapi.json").status_code == 404)
+r = rh.get("/employes")
+check("Sécurité : en-têtes nosniff / DENY présents", r.headers.get("x-content-type-options") == "nosniff" and r.headers.get("x-frame-options") == "DENY")
+check("Sécurité : en-têtes aussi sur les pièces jointes", rh.get("/" + zoa.cni_path).headers.get("x-content-type-options") == "nosniff")
+import app.routes.employes as _mod_emp
+_orig = _mod_emp.pdf_module.generer_fiche_employe_pdf
+_mod_emp.pdf_module.generer_fiche_employe_pdf = lambda *a, **k: 1 / 0
+nav500 = Navigateur(app, follow_redirects=False, raise_server_exceptions=False); nav500.cookies = rh.cookies
+r = nav500.get(f"/employes/{zoa.id}/pdf/fiche")
+_mod_emp.pdf_module.generer_fiche_employe_pdf = _orig
+check("Erreurs : bug inattendu → page 500 en français avec référence", r.status_code == 500 and "référence" in r.text)
+check("Erreurs : trace enregistrée dans logs/app.log", os.path.exists("logs/app.log") and "ZeroDivisionError" in open("logs/app.log", encoding="utf-8").read())
+# Point 3 : connexion par matricule, comptes en masse
+if not db.query(models.Utilisateur).filter_by(email="admin@t.cm").first():
+    db.add(models.Utilisateur(nom="Admin", email="admin@t.cm", role="Administrateur", mot_de_passe_hash=auth.hash_password("secret123")))
+m1 = models.Employe(nom="ABENA", prenom="Rita", genre="F", date_embauche=date(2020, 1, 1), departement_id=1, poste_id=1, grade_id=1,
+                    matricule="PASL-777", email_pro="r.abena@pasl.cm")
+m2 = models.Employe(nom="BELLA", prenom="Hugo", genre="H", date_embauche=date(2020, 1, 1), departement_id=1, poste_id=1, grade_id=1,
+                    matricule="PASL-778", email_perso="rh@t.cm")        # email perso déjà pris par un compte → matricule
+m3 = models.Employe(nom="SANS", prenom="Rien", genre="H", date_embauche=date(2020, 1, 1), departement_id=1, poste_id=1, grade_id=1)
+db.add_all([m1, m2, m3]); db.commit()
+adm = client("admin@t.cm")
+check("Comptes : nombre d'employés sans compte affiché", "sans compte d" in adm.get("/admin/utilisateurs").text)
+check("Comptes : réservé à l'administrateur", rh.post("/admin/utilisateurs/creer-comptes-manquants").status_code in (302, 303, 307))
+r = adm.post("/admin/utilisateurs/creer-comptes-manquants")
+from openpyxl import load_workbook
+wb = load_workbook(_io.BytesIO(r.content))
+lignes = {l[1]: l for l in wb["Comptes créés"].iter_rows(min_row=5, values_only=True)}
+check("Comptes : fichier Excel des identifiants renvoyé", r.status_code == 200 and "spreadsheetml" in r.headers.get("content-type", "") and "ABENA" in lignes)
+check("Comptes : identifiant = email pro en priorité", lignes["ABENA"][4] == "r.abena@pasl.cm")
+check("Comptes : email déjà pris → matricule", lignes["BELLA"][4] == "PASL-778")
+check("Comptes : employé sans email ni matricule listé à part", "Non créés" in wb.sheetnames and any(l[1] == "SANS" for l in wb["Non créés"].iter_rows(values_only=True)))
+db.expire_all()
+u_abena = db.query(models.Utilisateur).filter_by(email="r.abena@pasl.cm").first()
+check("Comptes : compte Employé rattaché, mot de passe provisoire signalé", u_abena and u_abena.role == "Employé" and u_abena.employe_id == m1.id and u_abena.doit_changer_mdp)
+mdp_abena = lignes["ABENA"][5]
+c_mat = ouvrir_page_connexion()
+r = c_mat.post("/login", data={"email": "  pasl-777 ", "mot_de_passe": mdp_abena})
+check("Connexion avec le matricule (casse et espaces ignorés)", r.status_code == 303 and r.headers["location"] == "/espace")
+c_maj = ouvrir_page_connexion()
+check("Connexion avec l'email en majuscules", c_maj.post("/login", data={"email": "R.ABENA@PASL.CM", "mot_de_passe": mdp_abena}).status_code == 303)
+r = adm.post("/admin/utilisateurs/creer-comptes-manquants")
+check("Comptes : second passage sans doublon (message pour l'employé sans identifiant)", r.status_code == 303 and "SANS" in unquote(r.headers["location"]) and db.query(models.Utilisateur).filter_by(employe_id=m1.id).count() == 1)
+# Point 8 : aucune ressource externe
+for page in ["/login", "/employes"]:
+    html = (ouvrir_page_connexion() if page == "/login" else rh).get(page).text
+    check(f"Hors ligne : aucune ressource Internet dans {page}", "https://" not in html and "/static/vendor/tailwind.css" in html)
+check("Hors ligne : feuilles de style embarquées servies", rh.get("/static/vendor/tailwind.css").status_code == 200 and rh.get("/static/vendor/polices.css").status_code == 200)
+
 # --- Pages principales toujours fonctionnelles ---
 for url in ["/", "/employes", f"/employes/{EMP_ID}?onglet=conges", "/demandes", "/absences?periode=toutes", "/conges",
             f"/employes/{EMP_ID}/pdf/fiche", "/export/dashboard.xlsx", "/export/dashboard.csv"]:

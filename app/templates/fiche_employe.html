@@ -188,12 +188,20 @@
       <dl class="grid grid-cols-[170px_1fr] gap-y-2.5 text-[13px]">
         <dt class="text-on-surface-variant">Genre</dt>
         <dd class="font-medium">{{ "Femme" if employe.genre == "F" else "Homme" }}</dd>
-        <dt class="text-on-surface-variant">Date de naissance</dt>
-        <dd class="font-medium">{{ employe.date_naissance.strftime(jour) if employe.date_naissance else "Non renseignée" }}</dd>
+        <dt class="text-on-surface-variant">Date et lieu de naissance</dt>
+        <dd class="font-medium">{{ employe.date_naissance.strftime(jour) if employe.date_naissance else "Non renseignée" }}{% if employe.lieu_naissance %} à {{ employe.lieu_naissance }}{% endif %}</dd>
+        <dt class="text-on-surface-variant">Nationalité</dt>
+        <dd class="font-medium">{{ employe.nationalite or "—" }}</dd>
+        <dt class="text-on-surface-variant">N° de CNI</dt>
+        <dd class="font-medium">{{ employe.numero_cni or "—" }}{% if employe.cni_delivree_le %} <span class="text-on-surface-variant font-normal">(délivrée le {{ employe.cni_delivree_le.strftime(jour) }})</span>{% endif %}</dd>
         <dt class="text-on-surface-variant">Situation familiale</dt>
         <dd class="font-medium">
           {{ employe.statut_matrimonial or "Non renseignée" }}{% if employe.nombre_enfants is not none %} · {{ employe.nombre_enfants }} enfant{{ "s" if employe.nombre_enfants > 1 else "" }}{% endif %}
         </dd>
+        <dt class="text-on-surface-variant">Niveau d'études</dt>
+        <dd class="font-medium">{{ employe.niveau_etudes or "—" }}</dd>
+        <dt class="text-on-surface-variant">Adresse</dt>
+        <dd class="font-medium">{{ employe.adresse or "—" }}</dd>
         <dt class="text-on-surface-variant">Email professionnel</dt>
         <dd class="font-medium break-all">{{ employe.email_pro or "—" }}</dd>
         <dt class="text-on-surface-variant">Email personnel</dt>
@@ -230,6 +238,8 @@
         </dd>
         <dt class="text-on-surface-variant">Date d'embauche</dt>
         <dd class="font-medium">{{ employe.date_embauche.strftime(jour) if employe.date_embauche else "—" }}</dd>
+        <dt class="text-on-surface-variant">N° CNPS</dt>
+        <dd class="font-medium">{{ employe.numero_cnps or "—" }}</dd>
         <dt class="text-on-surface-variant">Compte d'accès</dt>
         <dd class="font-medium">
           {% if not compte %}<span class="text-on-surface-variant">Aucun compte</span>

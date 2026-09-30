@@ -34,6 +34,25 @@
 </div>
 {% endif %}
 
+{# [PRODUCTION - POINT 3] Création en une fois des comptes des employés #}
+{% if nb_sans_compte %}
+<div class="card" style="padding:18px 22px;margin-bottom:20px;border-left:4px solid #06547A;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+  <div style="flex:1;min-width:280px;">
+    <div style="font-weight:700;font-size:14px;"><i class="fas fa-users" style="margin-right:6px;color:#06547A;"></i>{{ nb_sans_compte }} employé(s) actif(s) sans compte d'accès</div>
+    <div class="text-muted" style="font-size:12.5px;margin-top:4px;">
+      Un compte « Employé » est créé pour chacun. Identifiant : email professionnel, sinon email personnel, sinon matricule
+      (chacun peut aussi se connecter avec son matricule). Un fichier Excel avec les mots de passe provisoires est téléchargé :
+      c'est le <b>seul</b> endroit où ils figurent. Imprimez-le, distribuez-le, puis supprimez-le.
+    </div>
+  </div>
+  <form method="post" action="/admin/utilisateurs/creer-comptes-manquants"
+        onsubmit="if (!confirm('Créer {{ nb_sans_compte }} compte(s) et télécharger le fichier des mots de passe ?')) return false; var b = this.querySelector('button'); setTimeout(function(){ b.disabled = true; b.innerText = 'Création en cours… (jusqu\'à une minute). Actualisez la page une fois le fichier téléchargé.'; }, 0); return true;">
+    {{ csrf_input(request) }}
+    <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Créer les comptes manquants</button>
+  </form>
+</div>
+{% endif %}
+
 <div class="dashboard-grid" style="grid-template-columns:1.2fr 1fr;margin-bottom:24px;">
 
   <div class="card" style="padding:22px;">

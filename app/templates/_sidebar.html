@@ -34,6 +34,13 @@
         <span class="material-symbols-outlined text-[20px]">fact_check</span>
         <span>Mes validations</span>
       </a>
+      {# Point 10 : visible seulement pour un employé qui encadre une équipe #}
+      {% if request.session.get('est_n_plus_1') %}
+      <a href="/calendrier" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/calendrier') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">view_timeline</span>
+        <span>Calendrier de mon équipe</span>
+      </a>
+      {% endif %}
 
       {# =============================== #}
       {# ADMINISTRATEUR : dashboard + admin #}
@@ -77,6 +84,10 @@
         <span class="material-symbols-outlined text-[20px]">calendar_month</span>
         <span>Congés &amp; Soldes</span>
       </a>
+      <a href="/calendrier" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/calendrier') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">view_timeline</span>
+        <span>Calendrier d'équipe</span>
+      </a>
       {# [ÉTAPE 3] Décision des licenciements #}
       {% set nb_lic = nb_licenciements_a_decider() %}
       <a href="/licenciements" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/licenciements') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
@@ -109,6 +120,10 @@
       <a href="/conges" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/conges') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
         <span class="material-symbols-outlined text-[20px]">calendar_month</span>
         <span>Congés &amp; Soldes</span>
+      </a>
+      <a href="/calendrier" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/calendrier') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">
+        <span class="material-symbols-outlined text-[20px]">view_timeline</span>
+        <span>Calendrier d'équipe</span>
       </a>
       {# [ÉTAPE 3] Procédures de licenciement #}
       <a href="/licenciements" class="flex items-center gap-3 px-3 h-[40px] rounded transition-colors text-[13px] {{ 'bg-white/15 text-white border-l-[3px] border-white font-semibold' if request.url.path.startswith('/licenciements') else 'text-white/80 hover:bg-white/10 hover:text-white' }}">

@@ -8,6 +8,7 @@ from ..database import get_db
 from ..notifications import notifier_nouvelle_demande, notifier_avis_n_plus_1, email_employe
 from .. import models
 from ..calendrier import nb_jours_ouvrables, nb_jours_calendaires
+from ..presence import alertes_seuil
 from ..outils import _acces_refuse, _date_ou_none, _enregistrer_fichier, _entier_ou_none, _exiger_non_employe, _exiger_rh, _fmt_nombre, templates
 from ..regles_rh import STATUTS_TRAITES, _enregistrer_jours_conge, _solde_conges, _tranche_age, sortir_des_effectifs
 
@@ -433,6 +434,8 @@ def formulaire_avis_n_plus_1(demande_id: int, request: Request, db: Session = De
         "demande": demande,
         "type_libelle": types_demande_map.get(demande.type_demande_id, "—"),
         "erreur": None,
+        # Point 10 : avertissement si l'absence fait passer l'agence / le département sous son seuil
+        "alerte_presence": alertes_seuil(db, employe_concerne, demande.periode_sollicitee_debut, demande.periode_sollicitee_fin),
     })
 @router.post("/demandes/{demande_id}/avis-n-plus-1")
 def donner_avis_n_plus_1(
@@ -782,6 +785,10 @@ def traiter_demande_rh(demande_id: int, request: Request, db: Session = Depends(
         "demande": demande,
         "type_libelle": types_demande_map.get(demande.type_demande_id, "—"),
         "erreur": None,
+        # Point 10 : avertissement si l'absence fait passer l'agence / le département sous son seuil
+        "alerte_presence": alertes_seuil(db, demande.employe_concerne,
+                                         demande.periode_accordee_debut or demande.periode_sollicitee_debut,
+                                         demande.periode_accordee_fin or demande.periode_sollicitee_fin),
     })
 
 

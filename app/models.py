@@ -11,6 +11,8 @@ class Departement(Base):
     id = Column(Integer, primary_key=True)
     nom = Column(String(150), unique=True, nullable=False)
     code = Column(String(20), unique=True, nullable=True)
+    # Point 10 : nombre minimum d'agents présents chaque jour (agents de la DG rattachés à ce département)
+    seuil_presence_min = Column(Integer, nullable=True)
 
 
 class Agence(Base):
@@ -19,6 +21,8 @@ class Agence(Base):
     nom = Column(String(150), unique=True, nullable=False)
     ville = Column(String(100))
     region = Column(String(100))
+    # Point 10 : nombre minimum d'agents présents chaque jour dans l'agence
+    seuil_presence_min = Column(Integer, nullable=True)
 
 
 class Grade(Base):
@@ -80,6 +84,14 @@ class Employe(Base):
     contact_urgence_nom = Column(String(100), nullable=True)
     contact_urgence_tel = Column(String(30), nullable=True)
     n_plus_1_id = Column(Integer, ForeignKey("employes.id"), nullable=True)
+    # Fiche signalétique (validé par la RH le 30/09/2026) : tous facultatifs
+    lieu_naissance = Column(String(100), nullable=True)
+    nationalite = Column(String(60), nullable=True)
+    numero_cni = Column(String(30), nullable=True)
+    cni_delivree_le = Column(Date, nullable=True)
+    adresse = Column(String(255), nullable=True)          # quartier, ville
+    numero_cnps = Column(String(30), nullable=True)       # immatriculation à la sécurité sociale
+    niveau_etudes = Column(String(150), nullable=True)    # dernier diplôme obtenu
 
     __table_args__ = (CheckConstraint("genre IN ('H','F')", name="ck_employe_genre"),)
 

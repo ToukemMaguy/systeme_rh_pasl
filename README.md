@@ -2,6 +2,9 @@
 
 Application RH de Pan-African Savings & Loans (FastAPI + Jinja2 + MySQL).
 
+> **Mise en production sur le serveur de la PASL : voir [DEPLOIEMENT.md](DEPLOIEMENT.md).**
+> Ce README décrit l'installation sur un poste de développement.
+
 ## Installation
 
 ```bash
@@ -49,7 +52,16 @@ app/
 ├── journal.py         Journal d'audit automatique (qui a fait quoi, quand, avant → après)
 ├── notifications.py   Mails à chaque étape du circuit de validation
 ├── models.py          Tables de la base de données
-├── pdf.py             Documents PDF (fiche employé, attestation, certificat)
+├── pdf.py             Documents PDF (fiche signalétique, attestation, certificat, lettre de licenciement)
+├── presence.py        Calendrier d'équipe et seuil de présence par agence / département
+├── journal_technique.py  Fichier logs/app.log (erreurs techniques, avec la référence montrée à l'utilisateur)
+├── scripts/           Tâches lancées hors de l'application
+│   ├── envoyer_mails.py        Envoi des mails en attente (toutes les 10 min en production)
+│   ├── sauvegarder.py          Sauvegarde base + pièces jointes (chaque soir en production)
+│   ├── verifier_production.py  Contrôle de la configuration avant ouverture aux utilisateurs
+│   ├── create_admin.py         Création d'un compte en ligne de commande
+│   └── import_excel.py         Import initial de l'effectif
+├── static/vendor/     Styles, icônes et polices embarqués (aucun accès Internet nécessaire)
 └── routes/            Une page = un fichier, par domaine fonctionnel
     ├── auth.py            Connexion / déconnexion
     ├── tableau_de_bord.py Tableau de bord et exports Excel / CSV
@@ -60,7 +72,10 @@ app/
     ├── conges.py          Congés et soldes
     ├── compte.py          Changement de mot de passe
     ├── licenciements.py   Procédure de licenciement (conseil de discipline → Comité de direction)
-    └── admin.py           Comptes utilisateurs et référentiels
+    ├── calendrier_equipe.py Calendrier d'équipe et seuil de présence
+    └── admin.py           Comptes utilisateurs (dont création en masse) et référentiels
+deploiement/           Scripts du serveur : démarrage, tâches planifiées, pare-feu (voir DEPLOIEMENT.md)
+outils_front/          Configuration Tailwind et régénération de app/static/vendor/tailwind.css
 ```
 
 ## Calendrier des congés (`app/calendrier.py`)

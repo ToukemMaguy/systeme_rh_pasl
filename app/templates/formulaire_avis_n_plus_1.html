@@ -16,6 +16,8 @@
     <p class="text-[13px] text-on-surface-variant mt-0.5">Vous agissez en tant que N+1 de {{ demande.employe_concerne.nom }} {{ demande.employe_concerne.prenom }}</p>
   </div>
 
+  {% include "_alerte_presence.html" %}
+
   {% if erreur %}
   <div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ erreur }}</div>
   {% endif %}
