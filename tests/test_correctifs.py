@@ -661,6 +661,96 @@ for page in ["/login", "/employes"]:
     check(f"Hors ligne : aucune ressource Internet dans {page}", "https://" not in html and "/static/vendor/tailwind.css" in html)
 check("Hors ligne : feuilles de style embarquées servies", rh.get("/static/vendor/tailwind.css").status_code == 200 and rh.get("/static/vendor/polices.css").status_code == 200)
 
+# ================= Import du fichier RH (présentation fixhiier_r.xlsx) + registre MAD =================
+sys.path.insert(0, os.path.dirname(__file__))
+from fichier_rh_fictif import fabriquer
+from app.import_rh.lecture import lire_fichier, FichierNonConforme
+from app.import_rh.moteur import importer
+from app.import_rh import referentiel as REF
+check("Référentiel : écritures d'agences unifiées", REF.lieu_officiel("AGENCE DE MVOMGBI") == REF.lieu_officiel("Yaoundé / Mvog-Mbi") == "Agence de Mvog-Mbi")
+check("Référentiel : siège, section YAOUNDE et MAD", REF.lieu_officiel("DIRECTION GENERALE/ HEAD OFFICE") == REF.lieu_officiel("YAOUNDE") == REF.SIEGE
+      and REF.lieu_officiel("MIS A DISPOSITION") == REF.MAD and REF.lieu_officiel("Planète Mars") is False)
+check("Référentiel : LAA ignoré (ancien poste du DGA)", REF.direction_depuis_code("LAA") is None and "LAA" in REF.CODES_IGNORES)
+check("Référentiel : fonctions (LOI = Loan Officer, DAF = DCF, GIS = RH/MG)", REF.fonction_officielle("LOI") == ("Loan Officer (LO)", "DEXRA")
+      and REF.direction_depuis_code("DAF") == "DCF" and REF.direction_depuis_code("GIS") == "DRHMG")
+fabriquer("_rh_test.xlsx")
+contenu = lire_fichier("_rh_test.xlsx")
+avant = db.query(models.Employe).count()
+rap = importer(db, contenu, appliquer=False)
+db.expire_all()
+check("Import : la simulation n'enregistre rien", db.query(models.Employe).count() == avant and len(rap.crees) == 5, rap.resume())
+rap = importer(db, contenu, appliquer=True)
+db.expire_all()
+atb = db.query(models.Employe).filter_by(nom="ATEBA").first(); ngo = db.query(models.Employe).filter_by(nom="NGONO", prenom="Alice", matricule="103").first()
+mba = db.query(models.Employe).filter_by(nom="MBALLA").first(); fou = db.query(models.Employe).filter_by(nom="FOUDA", prenom="Luc").first()
+check("Import : agence officielle et direction déduite de la fonction", ngo and ngo.agence.nom == "Agence de Mvog-Mbi" and ngo.departement.code == "DEXRA" and ngo.poste.intitule == "Loan Officer (LO)")
+check("Import : caissier d'agence rattaché à la DOT", db.query(models.Employe).filter_by(nom="ESSOMBA", prenom="Marie").first().departement.code == "DOT")
+check("Import : personnel du siège sans agence (DG et section YAOUNDE)", mba.agence_id is None and fou.agence_id is None and fou.departement.code == "DER")
+check("Import : matricules repris (Provision congés, puis Entrées)", mba.matricule == "101" and fou.matricule == "900")
+check("Import : N+1 = chef d'agence", ngo.n_plus_1_id == atb.id and atb.n_plus_1_id is None)
+check("Import : mis à disposition dans le registre, pas dans les employés",
+      db.query(models.PersonnelMAD).filter_by(nom_complet="OWONA Paul").count() == 1 and db.query(models.Employe).filter_by(nom="OWONA").count() == 0)
+check("Import : solde d'ouverture = « Total » du fichier à la fin de période", M._solde_conges(db, ngo, jusqua=date(2026, 8, 31))["total_restant"] == 18)
+check("Import : congés passés dans l'historique, sans toucher au solde", db.query(models.Absence).filter_by(employe_id=ngo.id).count() >= 1)
+check("Import : mouvement interne dans le parcours", db.query(models.Affectation).filter_by(employe_id=ngo.id).count() == 2)
+anc = db.query(models.Employe).filter_by(nom="ANCIEN").first()
+check("Import : ancien employé (départ) en historique, inactif, agence reconnue", anc and anc.statut == "inactif" and anc.agence.nom == "Agence de Bonamoussadi")
+check("Import : un départ d'homonyme ne sort PAS un employé actif", ngo.statut == "actif" and any("réembauche ou homonyme" in x for x in rap.infos))
+check("Import : salaires jamais lus", not any("999999" in str(v) for p in contenu.provision for v in vars(p).values()))
+from app.import_rh.moteur import _Cache
+p_existant = models.Poste(intitule="directeur des engagements et du recouvrement ")
+db.add(p_existant); db.flush()
+check("Import : intitulé de poste déjà présent avec une autre casse réutilisé (pas de doublon MySQL)",
+      _Cache(db).poste("Directeur des Engagements et du Recouvrement") is p_existant)
+db.rollback()
+rap2 = importer(db, lire_fichier("_rh_test.xlsx"), appliquer=True)
+check("Import : deuxième passage sans doublon", len(rap2.crees) == 0 and rap2.soldes == 0 and rap2.conges_historique == 0 and rap2.anciens_employes == 0, rap2.resume())
+fabriquer("_rh_test.xlsx", "telephone_vide")
+importer(db, lire_fichier("_rh_test.xlsx"), appliquer=True); db.expire_all()
+check("Import : une case vide n'efface rien", db.get(models.Employe, ngo.id).telephone_pro == "699000003")
+fabriquer("_rh_test.xlsx", "telephone_modifie")
+rap3 = importer(db, lire_fichier("_rh_test.xlsx"), appliquer=True); db.expire_all()
+check("Import : modification détectée et appliquée (avant → après)", db.get(models.Employe, ngo.id).telephone_pro == "655555555"
+      and any("699000003 → 655555555" in " ".join(ch) for _, ch in rap3.modifies))
+fabriquer("_rh_test.xlsx", "colonne_inseree")
+try:
+    lire_fichier("_rh_test.xlsx"); ok = False
+except FichierNonConforme as e:
+    ok = "G2" in str(e)
+check("Import : fichier dont la présentation a changé → refusé avec un message clair", ok)
+# Page web de la RH
+fabriquer("_rh_test.xlsx")
+contenu_xlsx = open("_rh_test.xlsx", "rb").read()
+r = rh.post("/fichier-rh/simuler", files={"fichier": ("fixhiier_r.xlsx", contenu_xlsx, "application/vnd.ms-excel")})
+jeton = re.search(r'name="jeton" value="([0-9a-f]{32})"', r.text)
+check("Page fichier RH : simulation affichée avec confirmation", r.status_code == 200 and "rien n'a encore été enregistré" in r.text and jeton is not None)
+check("Page fichier RH : rapport Excel téléchargeable", rh.get(f"/fichier-rh/rapport/{jeton.group(1)}/simulation").status_code == 200)
+r = rh.post("/fichier-rh/appliquer", data={"jeton": jeton.group(1)})
+check("Page fichier RH : application", r.status_code == 200 and "Mise à jour enregistrée" in r.text)
+check("Page fichier RH : jeton déjà utilisé refusé", rh.post("/fichier-rh/appliquer", data={"jeton": jeton.group(1)}).status_code == 400)
+check("Page fichier RH : autre format refusé", rh.post("/fichier-rh/simuler", files={"fichier": ("x.csv", b"a;b", "text/csv")}).status_code == 400)
+check("Page fichier RH : réservée à la RH", comite.get("/fichier-rh").status_code in (302, 303, 307))
+os.remove("_rh_test.xlsx")
+# Registre MAD
+check("MAD : registre visible (RH et Comité)", "OWONA Paul" in rh.get("/personnel-mad").text and comite.get("/personnel-mad").status_code == 200)
+check("MAD : Comité en lecture seule", "personnel-mad/nouveau" not in comite.get("/personnel-mad").text
+      and comite.post("/personnel-mad/enregistrer", data={"nom_complet": "X"}).status_code in (302, 303, 307))
+rh.post("/personnel-mad/enregistrer", data={"nom_complet": "  KOUAM   Serge ", "fonction": "Chauffeur", "societe": "Prestataire SA", "actif": "1"})
+k = db.query(models.PersonnelMAD).filter_by(nom_complet="KOUAM Serge").first()
+check("MAD : ajout avec son entreprise de placement", k is not None and k.actif and k.societe == "Prestataire SA")
+page_mad = rh.get("/personnel-mad").text
+check("MAD : décompte par entreprise de placement", "Par entreprise de placement" in page_mad and "Prestataire SA" in page_mad)
+check("MAD : filtre par entreprise", "KOUAM Serge" in rh.get("/personnel-mad?entreprise=Prestataire%20SA").text
+      and "OWONA Paul" not in rh.get("/personnel-mad?entreprise=Prestataire%20SA").text)
+rh.post("/personnel-mad/enregistrer", data={"mad_id": str(k.id), "nom_complet": "KOUAM Serge", "date_debut": "2026-01-01", "date_fin": "2026-06-30"})
+db.expire_all(); k = db.get(models.PersonnelMAD, k.id)
+check("MAD : fin de mise à disposition (plus « en cours »)", not k.actif and k.date_fin == date(2026, 6, 30))
+check("MAD : dates incohérentes refusées", rh.post("/personnel-mad/enregistrer", data={"nom_complet": "Z", "date_debut": "2026-05-01", "date_fin": "2026-01-01"}).status_code == 400)
+K_ID = k.id
+rh.post(f"/personnel-mad/{K_ID}/supprimer"); db.expire_all()
+check("MAD : retrait du registre", db.get(models.PersonnelMAD, K_ID) is None)
+check("Tableau de bord : compteur des mis à disposition", "mis à disposition" in rh.get("/").text)
+
 # --- Pages principales toujours fonctionnelles ---
 for url in ["/", "/employes", f"/employes/{EMP_ID}?onglet=conges", "/demandes", "/absences?periode=toutes", "/conges",
             f"/employes/{EMP_ID}/pdf/fiche", "/export/dashboard.xlsx", "/export/dashboard.csv"]:
