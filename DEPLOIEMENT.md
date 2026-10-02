@@ -46,13 +46,6 @@ GRANT ALL PRIVILEGES ON systeme_rh.* TO 'pasl_rh'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-**Reprendre les données saisies en développement** (employés, demandes...) :
-1. Sur ton PC : phpMyAdmin → base `systeme_rh` → **Exporter** → *Rapide* → SQL → Exécuter.
-2. Sur le serveur : phpMyAdmin → base `systeme_rh` → **Importer** → choisir le fichier → Exécuter.
-3. Copier aussi le dossier `app\static\uploads\employes` de ton PC vers le même endroit sur le serveur
-   (photos, CNI, justificatifs).
-4. Supprimer ensuite les **comptes et données de test** (le script de l'étape 5 les signale).
-
 ## 4. Configurer le fichier `.env` du serveur
 
 ```powershell
@@ -74,6 +67,25 @@ Puis mettre la base au niveau de l'application :
 ```powershell
 venv\Scripts\python.exe -m alembic upgrade head
 ```
+
+### Charger le personnel depuis le fichier Excel de la RH
+
+On ne recopie **pas** la base de développement : on charge le fichier de la RH (même présentation que
+`fixhiier_r.xlsx`). Copier ce fichier dans `C:\PASL-RH\data\`, puis :
+
+```powershell
+# 1. Simulation : rien n'est enregistré, un rapport détaillé est écrit dans data\rapport_import_....xlsx
+venv\Scripts\python.exe -m app.scripts.import_fichier_rh data\fixhiier_r.xlsx
+
+# 2. Lire le rapport (feuille « À vérifier »), puis charger pour de bon :
+venv\Scripts\python.exe -m app.scripts.import_fichier_rh data\fixhiier_r.xlsx --appliquer
+```
+
+`--repartir-de-zero --appliquer` efface d'abord toutes les données du personnel (à n'utiliser qu'**avant**
+l'ouverture aux utilisateurs, par exemple pour recharger un fichier corrigé ; il demande de taper OUI).
+
+Ensuite, la RH met l'application à jour **elle-même** depuis le menu **« Mise à jour depuis le fichier RH »**
+(dépôt du fichier, vérification, puis application).
 
 ## 5. Vérifier avant d'ouvrir
 
@@ -113,9 +125,19 @@ pare-feu du serveur, ou nom du serveur (essayer avec son adresse IP : commande `
    Identifiant : email professionnel, sinon email personnel, sinon matricule. **Chacun peut aussi se
    connecter avec son matricule.**
 3. Un fichier Excel est téléchargé avec les **mots de passe provisoires** : c'est le seul endroit où
-   ils figurent. L'imprimer, découper une ligne par personne, la remettre en main propre,
-   puis **supprimer le fichier**.
-4. Les comptes RH, Comité et Administrateur se créent un par un sur la même page (bon rôle à choisir).
+   ils figurent. L'enregistrer dans `C:\PASL-RH\data\comptes.xlsx`.
+4. Imprimer **une page par employé** (guide Employé avec ses accès déjà remplis, plus la page « Guide N+1 »
+   pour les responsables qui ont des collaborateurs) :
+
+   ```powershell
+   venv\Scripts\python.exe -m app.scripts.imprimer_identifiants data\comptes.xlsx --adresse http://NOM-DU-SERVEUR:8000
+   ```
+
+   Le PDF `data\acces_personnels_....pdf` est classé par agence / direction puis par nom. L'imprimer, remettre
+   chaque page en main propre, puis **supprimer le PDF et le fichier Excel** (ils contiennent les mots de passe).
+5. Les comptes RH, Comité et Administrateur se créent un par un sur la même page (bon rôle à choisir).
+   Leurs guides (accès à remplir à la main) : `venv\Scripts\python.exe -m app.scripts.imprimer_identifiants --vierges`
+   → `data\guides_utilisateurs.pdf`.
 
 ## 8. Lancement conseillé
 

@@ -1,7 +1,7 @@
 """Point 10 : calendrier d'équipe et seuil de présence (validé par la RH le 30/09/2026).
 
 Règles :
-- Une « unité » est l'agence de l'employé ; s'il n'est rattaché à aucune agence (Direction Générale),
+- Une « unité » est l'agence de l'employé ; s'il n'est rattaché à aucune agence (personnel du siège),
   c'est son département.
 - Chaque agence et chaque département peut avoir un seuil : le NOMBRE MINIMUM d'agents présents
   chaque jour ouvrable. Sans seuil, aucun contrôle.
@@ -34,7 +34,7 @@ def objet_unite(db: Session, unite: tuple[str, int]):
 def libelle_unite(objet, genre: str) -> str:
     if objet is None:
         return "—"
-    return objet.nom if genre == "agence" else f"{objet.nom} (Direction Générale)"
+    return objet.nom if genre == "agence" else f"{objet.nom} (Siège)"
 
 
 def lire_unite(valeur: str | None) -> tuple[str, int] | None:
@@ -189,10 +189,10 @@ def calendrier_mois(db: Session, employes: list[models.Employe], annee: int, moi
 
 
 def unites_disponibles(db: Session) -> list[dict]:
-    """Liste pour le sélecteur : agences, puis départements de la Direction Générale."""
+    """Liste pour le sélecteur : agences, puis directions du siège."""
     unites = [{"cle": f"agence-{a.id}", "libelle": a.nom, "groupe": "Agences", "seuil": a.seuil_presence_min}
               for a in db.query(models.Agence).order_by(models.Agence.nom).all()]
-    unites += [{"cle": f"departement-{d.id}", "libelle": d.nom, "groupe": "Direction Générale (départements)",
+    unites += [{"cle": f"departement-{d.id}", "libelle": d.nom, "groupe": "Siège (par direction)",
                 "seuil": d.seuil_presence_min}
                for d in db.query(models.Departement).order_by(models.Departement.nom).all()]
     return unites

@@ -344,7 +344,7 @@ def liste_absences(
     # Groupement par agence
     absences_par_agence: dict[str, list] = {}
     for a in absences:
-        nom_agence = a.employe.agence.nom if a.employe and a.employe.agence else "Direction Générale"
+        nom_agence = a.employe.agence.nom if a.employe and a.employe.agence else "Siège"
         absences_par_agence.setdefault(nom_agence, []).append(a)
     groupes = sorted(absences_par_agence.items(), key=lambda x: x[0])
 

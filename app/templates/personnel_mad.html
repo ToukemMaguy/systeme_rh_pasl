@@ -1,0 +1,87 @@
+{% extends "_layout.html" %}
+{% block title %}Personnel mis à disposition{% endblock %}
+{% block breadcrumb %}Personnel mis à disposition{% endblock %}
+{% block content %}
+{% set carte = "bg-surface-container-lowest rounded-xl shadow-sm" %}
+<div class="flex flex-col gap-4 max-w-[1200px]">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-[22px] font-semibold text-on-surface">Personnel mis à disposition</h1>
+      <p class="text-[13px] text-on-surface-variant mt-0.5">Chauffeurs, agents de recouvrement, DSA… venant d'entreprises de placement :
+        ce ne sont pas des employés de la PASL (ni contrat ni matricule), mais ils sont suivis ici.</p>
+    </div>
+    {% if est_rh %}
+    <a href="/personnel-mad/nouveau" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-primary-container text-white text-[13px] font-semibold">
+      <span class="material-symbols-outlined text-[18px]">person_add</span>Ajouter</a>
+    {% endif %}
+  </div>
+
+  {% if request.query_params.get('ok') %}
+  <div class="px-4 py-2.5 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px]">{{ request.query_params.get('ok') }}</div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="{{ carte }} p-4">
+      <div class="text-[11.5px] uppercase tracking-wider text-on-surface-variant font-semibold">Mis à disposition actuellement</div>
+      <div class="text-[30px] font-bold text-primary-container mt-1">{{ nb_actifs }}</div>
+    </div>
+    <div class="{{ carte }} p-4">
+      <div class="text-[11.5px] uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Par entreprise de placement</div>
+      {% for libelle, n in par_entreprise %}
+      <a href="/personnel-mad?statut={{ statut }}&entreprise={{ '-' if libelle == 'Non renseignée' else libelle | urlencode }}"
+         class="flex justify-between text-[13px] hover:text-primary {{ 'font-semibold text-primary' if entreprise and (entreprise == libelle or (entreprise == '-' and libelle == 'Non renseignée')) else '' }}"><span>{{ libelle }}</span><b>{{ n }}</b></a>
+      {% else %}<div class="text-[13px] text-on-surface-variant">—</div>{% endfor %}
+      {% if entreprise %}<a href="/personnel-mad?statut={{ statut }}" class="block text-[12px] text-primary underline mt-2">Voir toutes les entreprises</a>{% endif %}
+    </div>
+    <div class="{{ carte }} p-4">
+      <div class="text-[11.5px] uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Par fonction</div>
+      {% for libelle, n in par_fonction %}<div class="flex justify-between text-[13px]"><span>{{ libelle }}</span><b>{{ n }}</b></div>{% else %}<div class="text-[13px] text-on-surface-variant">—</div>{% endfor %}
+    </div>
+    <div class="{{ carte }} p-4">
+      <div class="text-[11.5px] uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Par lieu</div>
+      {% for libelle, n in par_lieu %}<div class="flex justify-between text-[13px]"><span>{{ libelle }}</span><b>{{ n }}</b></div>{% else %}<div class="text-[13px] text-on-surface-variant">—</div>{% endfor %}
+    </div>
+  </div>
+
+  <div class="{{ carte }}">
+    <div class="flex gap-1 px-4 border-b border-surface-container-high text-[13px]">
+      {% for cle, libelle in [("actifs", "En cours"), ("anciens", "Terminés"), ("tous", "Tous")] %}
+      <a href="/personnel-mad?statut={{ cle }}" class="px-4 h-[44px] flex items-center border-b-[3px] {{ 'text-primary font-semibold border-primary-container' if statut == cle else 'text-on-surface-variant border-transparent' }}">{{ libelle }}</a>
+      {% endfor %}
+    </div>
+    {% if personnes %}
+    <div class="overflow-x-auto">
+    <table class="w-full text-[13px]">
+      <thead class="text-[11.5px] uppercase text-on-surface-variant bg-surface-container-low">
+        <tr><th class="text-left px-4 py-2">Nom</th><th class="text-left px-3 py-2">Fonction</th><th class="text-left px-3 py-2">Direction</th>
+            <th class="text-left px-3 py-2">Lieu</th><th class="text-left px-3 py-2">Entreprise de placement</th><th class="text-left px-3 py-2">Téléphone</th>
+            <th class="text-left px-3 py-2">Depuis</th>{% if est_rh %}<th></th>{% endif %}</tr>
+      </thead>
+      <tbody>
+        {% for p in personnes %}
+        <tr class="border-b border-surface-container {{ '' if p.actif else 'text-on-surface-variant' }}">
+          <td class="px-4 py-2.5 font-medium">{{ p.nom_complet }}{% if not p.actif %} <span class="text-[11px]">(terminé{% if p.date_fin %} le {{ p.date_fin.strftime('%d/%m/%Y') }}{% endif %})</span>{% endif %}</td>
+          <td class="px-3">{{ p.fonction or "—" }}</td>
+          <td class="px-3">{{ p.departement.code or p.departement.nom if p.departement else "—" }}</td>
+          <td class="px-3">{{ p.agence.nom if p.agence else "Siège" }}</td>
+          <td class="px-3">{{ p.societe or "—" }}</td>
+          <td class="px-3 whitespace-nowrap">{{ p.telephone or "—" }}</td>
+          <td class="px-3 whitespace-nowrap">{{ p.date_debut.strftime('%d/%m/%Y') if p.date_debut else "—" }}</td>
+          {% if est_rh %}
+          <td class="px-3 text-right whitespace-nowrap">
+            <a href="/personnel-mad/{{ p.id }}/modifier" class="text-primary text-[12.5px] font-semibold hover:underline">Modifier</a>
+            <form method="post" action="/personnel-mad/{{ p.id }}/supprimer" class="inline ml-2" onsubmit="return confirm('Retirer {{ p.nom_complet }} du registre ? (pour une fin de mise à disposition, préférez « Modifier » puis décocher « En cours »)');">
+              {{ csrf_input(request) }}<button type="submit" class="text-error text-[12.5px] font-semibold hover:underline">Retirer</button></form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p class="p-6 text-[13px] text-on-surface-variant">Aucune personne dans cette liste.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

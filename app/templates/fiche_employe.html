@@ -57,7 +57,7 @@
         <div class="text-[13.5px] text-on-surface-variant mt-1">
           {{ employe.poste.intitule if employe.poste else "—" }}
           · {{ employe.departement.nom if employe.departement else "—" }}
-          · {{ employe.agence.nom if employe.agence else "Direction Générale" }}
+          · {{ employe.agence.nom if employe.agence else "Siège" }}
         </div>
       </div>
 
@@ -231,7 +231,7 @@
         <dt class="text-on-surface-variant">Département</dt>
         <dd class="font-medium">{{ employe.departement.nom if employe.departement else "—" }}</dd>
         <dt class="text-on-surface-variant">Agence</dt>
-        <dd class="font-medium">{{ employe.agence.nom if employe.agence else "Aucune (Direction Générale)" }}</dd>
+        <dd class="font-medium">{{ employe.agence.nom if employe.agence else "Siège (Douala - Koumassi)" }}</dd>
         <dt class="text-on-surface-variant">Supérieur (N+1)</dt>
         <dd class="font-medium">
           {% if employe.n_plus_1 %}<a href="/employes/{{ employe.n_plus_1.id }}" class="text-primary hover:underline">{{ employe.n_plus_1.nom }} {{ employe.n_plus_1.prenom }}</a>{% else %}Non défini{% endif %}

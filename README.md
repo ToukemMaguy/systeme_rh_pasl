@@ -60,7 +60,8 @@ app/
 │   ├── sauvegarder.py          Sauvegarde base + pièces jointes (chaque soir en production)
 │   ├── verifier_production.py  Contrôle de la configuration avant ouverture aux utilisateurs
 │   ├── create_admin.py         Création d'un compte en ligne de commande
-│   └── import_excel.py         Import initial de l'effectif
+│   └── import_fichier_rh.py    Import du fichier Excel de la RH (simulation, puis --appliquer)
+├── import_rh/         Lecture du fichier RH et table de traduction (agences, directions, fonctions)
 ├── static/vendor/     Styles, icônes et polices embarqués (aucun accès Internet nécessaire)
 └── routes/            Une page = un fichier, par domaine fonctionnel
     ├── auth.py            Connexion / déconnexion

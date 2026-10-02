@@ -1,0 +1,116 @@
+{% extends "_layout.html" %}
+{# Mise à jour depuis le fichier RH : dépôt -> simulation (rien n'est enregistré) -> application #}
+{% block title %}Mettre à jour depuis le fichier RH{% endblock %}
+{% block breadcrumb %}Mettre à jour depuis le fichier RH{% endblock %}
+{% block content %}
+{% set carte = "bg-surface-container-lowest rounded-xl shadow-sm" %}
+<div class="flex flex-col gap-4 max-w-[1100px]">
+
+  <div>
+    <h1 class="text-[22px] font-semibold text-on-surface">Mettre à jour depuis le fichier RH</h1>
+    <p class="text-[13px] text-on-surface-variant mt-0.5">Déposez votre fichier habituel (même présentation que d'habitude) :
+      l'application affiche d'abord ce qui va changer, et n'enregistre rien avant votre confirmation.</p>
+  </div>
+
+  {# ---- Étapes ---- #}
+  {% set etapes = [("depot", "1. Dépôt du fichier"), ("simulation", "2. Vérification"), ("applique", "3. Mise à jour faite")] %}
+  <div class="flex flex-wrap gap-2 text-[12.5px]">
+    {% for cle, libelle in etapes %}
+    <span class="px-3 py-1 rounded-full font-semibold {{ 'bg-primary-container text-white' if cle == etape else 'bg-surface-container text-on-surface-variant' }}">{{ libelle }}</span>
+    {% endfor %}
+  </div>
+
+  {% if erreur %}
+  <div class="px-4 py-2.5 rounded-lg bg-error-container text-error text-[13px]">{{ erreur }}</div>
+  {% endif %}
+
+  {% if etape == "depot" %}
+  <div class="{{ carte }} p-5">
+    <form method="post" action="/fichier-rh/simuler" enctype="multipart/form-data" class="flex flex-wrap items-end gap-4"
+          onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').innerText='Analyse en cours…';">
+      {{ csrf_input(request) }}
+      <div>
+        <label class="block text-[12px] text-on-surface-variant font-medium mb-1">Fichier Excel de la RH (.xlsx)</label>
+        <input type="file" name="fichier" accept=".xlsx" required class="text-[13px]">
+      </div>
+      <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-5 rounded-lg bg-primary-container text-white text-[13px] font-semibold">
+        <span class="material-symbols-outlined text-[18px]">fact_check</span>Analyser le fichier</button>
+    </form>
+    <ul class="mt-5 text-[12.5px] text-on-surface-variant list-disc ml-5 flex flex-col gap-1">
+      <li>Ce que contient le fichier (nom, fonction, agence, date d'embauche, téléphones, email) met à jour les fiches.</li>
+      <li>Ce qui n'existe que dans l'application (CNI, CNPS, photos, comptes, demandes, N+1 déjà choisi) n'est jamais modifié.</li>
+      <li>Une case vide dans le fichier n'efface rien. Un employé absent du fichier n'est ni supprimé ni sorti des effectifs : il est seulement signalé.</li>
+      <li>Les agents « mis à disposition » vont dans leur registre ; les salaires du fichier ne sont jamais lus.</li>
+    </ul>
+  </div>
+
+  {% else %}
+  {# ---- Résultat (simulation ou appliqué) ---- #}
+  {% if etape == "simulation" %}
+  <div class="px-4 py-3 rounded-lg bg-[#EBF4FF] text-[#2B6CB0] text-[13px] flex flex-wrap items-center gap-3">
+    <span class="material-symbols-outlined text-[18px]">info</span>
+    <span><b>Simulation</b> du fichier « {{ nom_fichier }} » : <b>rien n'a encore été enregistré</b>. Vérifiez puis confirmez en bas de page.</span>
+  </div>
+  {% else %}
+  <div class="px-4 py-3 rounded-lg bg-[#F0FDF4] text-[#166534] text-[13px] flex items-center gap-2">
+    <span class="material-symbols-outlined text-[18px]">check_circle</span><b>Mise à jour enregistrée.</b> Elle est tracée dans le journal d'audit.
+  </div>
+  {% endif %}
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    {% for libelle, valeur in [("Employés créés", rapport.crees|length), ("Fiches modifiées", rapport.modifies|length),
+                               ("Inchangées", rapport.inchanges), ("Mis à disposition ajoutés", rapport.mad_crees|length),
+                               ("N+1 pré-remplis", rapport.n_plus_1|length), ("Soldes de congés repris", rapport.soldes),
+                               ("Points à vérifier", rapport.a_verifier|length), ("Écritures inconnues", rapport.inconnus|length)] %}
+    <div class="{{ carte }} p-3">
+      <div class="text-[11.5px] uppercase tracking-wider text-on-surface-variant font-semibold">{{ libelle }}</div>
+      <div class="text-[22px] font-bold {{ 'text-[#975a16]' if ('vérifier' in libelle or 'inconnues' in libelle) and valeur else 'text-on-surface' }}">{{ valeur }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% macro liste(titre, elements, couleur="", ouvert=False) %}
+  {% if elements %}
+  <details class="{{ carte }} p-4" {{ 'open' if ouvert else '' }}>
+    <summary class="cursor-pointer text-[14px] font-semibold {{ couleur }}">{{ titre }} ({{ elements|length }})</summary>
+    <ul class="mt-3 text-[13px] flex flex-col gap-1.5 max-h-[420px] overflow-y-auto">
+      {% for e in elements %}
+      <li class="border-b border-surface-container pb-1.5">
+        {% if e is string %}{{ e }}
+        {% elif e[1] is string %}<b>{{ e[0] }}</b> — {{ e[1] }}
+        {% else %}<b>{{ e[0] }}</b> : {{ e[1] | join(" · ") }}{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+  {% endmacro %}
+
+  {{ liste("Points à vérifier par la RH", rapport.a_verifier, "text-[#975a16]", True) }}
+  {{ liste("Écritures non reconnues (à signaler à l'administratrice)", rapport.inconnus, "text-error", True) }}
+  {{ liste("Fiches modifiées (avant → après)", rapport.modifies, "", etape == "simulation") }}
+  {{ liste("Nouveaux employés", rapport.crees) }}
+  {{ liste("N+1 pré-remplis (chef d'agence)", rapport.n_plus_1) }}
+  {{ liste("Ajoutés au registre des mis à disposition", rapport.mad_crees) }}
+  {{ liste("Employés actifs absents du fichier (aucune action faite)", rapport.absents_du_fichier) }}
+  {{ liste("Pour information", rapport.infos) }}
+
+  <div class="{{ carte }} p-4 flex flex-wrap items-center gap-3">
+    <a href="/fichier-rh/rapport/{{ jeton }}/{{ 'simulation' if etape == 'simulation' else 'applique' }}" class="inline-flex items-center gap-2 h-[38px] px-4 rounded-lg bg-surface-container-high text-[13px] font-semibold">
+      <span class="material-symbols-outlined text-[18px]">download</span>Rapport détaillé (Excel)</a>
+    {% if etape == "simulation" %}
+    <form method="post" action="/fichier-rh/appliquer" class="ml-auto flex items-center gap-3"
+          onsubmit="if (!confirm('Enregistrer ces changements dans l\'application ?')) return false; this.querySelector('button').disabled=true; return true;">
+      {{ csrf_input(request) }}
+      <input type="hidden" name="jeton" value="{{ jeton }}">
+      <a href="/fichier-rh" class="text-[13px] text-on-surface-variant underline">Annuler</a>
+      <button type="submit" class="inline-flex items-center gap-2 h-[38px] px-5 rounded-lg bg-[#38a169] text-white text-[13px] font-semibold">
+        <span class="material-symbols-outlined text-[18px]">done_all</span>Appliquer ces changements</button>
+    </form>
+    {% else %}
+    <a href="/fichier-rh" class="ml-auto text-[13px] text-primary underline">Déposer un autre fichier</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

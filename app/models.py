@@ -278,6 +278,28 @@ class JournalAudit(Base):
     details = Column(JSON, nullable=True)                          # {colonne: [avant, après]}
 
 
+class PersonnelMAD(Base):
+    """Personnel mis à disposition (chauffeurs, agents de recouvrement, DSA...) : ce ne sont PAS des employés
+    de la PASL (ni contrat ni matricule), mais la RH doit savoir combien il y en a et où (décision RH 30/09/2026)."""
+    __tablename__ = "personnel_mad"
+    id = Column(Integer, primary_key=True)
+    nom_complet = Column(String(200), nullable=False)
+    fonction = Column(String(150), nullable=True)
+    departement_id = Column(Integer, ForeignKey("departements.id"), nullable=True)
+    agence_id = Column(Integer, ForeignKey("agences.id"), nullable=True)       # vide = Siège
+    societe = Column(String(150), nullable=True)                               # entreprise de placement d'origine
+    telephone = Column(String(30), nullable=True)
+    email = Column(String(150), nullable=True)
+    date_debut = Column(Date, nullable=True)
+    date_fin = Column(Date, nullable=True)
+    actif = Column(Boolean, default=True, nullable=False)
+    observations = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    departement = relationship("Departement")
+    agence = relationship("Agence")
+
+
 class Licenciement(Base):
     """Dossier de licenciement (étape 3).
 

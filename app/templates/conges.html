@@ -163,7 +163,7 @@
           <tr class="border-t border-surface-container-high hover:bg-surface-container-low/40">
             <td class="py-3 px-4 font-medium">{{ s.employe.nom }} {{ s.employe.prenom }}</td>
             <td class="py-3 px-4 text-on-surface-variant text-[12.5px]">{{ s.employe.departement.nom if s.employe.departement else "—" }}</td>
-            <td class="py-3 px-4 text-on-surface-variant text-[12.5px]">{{ s.employe.agence.nom if s.employe.agence else "Direction Générale" }}</td>
+            <td class="py-3 px-4 text-on-surface-variant text-[12.5px]">{{ s.employe.agence.nom if s.employe.agence else "Siège" }}</td>
             <td class="py-3 px-4 text-on-surface-variant text-[12.5px]">{{ s.anciennete }}</td>
             <td class="py-3 px-4 text-center font-semibold">{{ alloues }}j</td>
             <td class="py-3 px-4 text-center font-semibold text-[#b7791f]">{{ pris | fmt_nombre }}j</td>

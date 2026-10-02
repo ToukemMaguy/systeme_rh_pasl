@@ -26,7 +26,7 @@
       <div class="mt-4 flex flex-col">
         <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Matricule</span><span class="font-medium text-on-surface">{{ employe.matricule or "—" }}</span></div>
         <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Département</span><span class="font-medium text-on-surface">{{ employe.departement.nom if employe.departement else "—" }}</span></div>
-        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Agence</span><span class="font-medium text-on-surface">{{ employe.agence.nom if employe.agence else "Direction Générale" }}</span></div>
+        <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Agence</span><span class="font-medium text-on-surface">{{ employe.agence.nom if employe.agence else "Siège" }}</span></div>
         <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Date d'embauche</span><span class="font-medium text-on-surface">{{ employe.date_embauche.strftime("%d/%m/%Y") if employe.date_embauche else "—" }}</span></div>
         <div class="flex justify-between py-2 border-b border-surface-container-high text-[12.5px]"><span class="text-on-surface-variant">Ancienneté</span><span class="font-medium text-on-surface">{{ anciennete }}</span></div>
         <div class="flex justify-between py-2 text-[12.5px]">

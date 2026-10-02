@@ -198,6 +198,7 @@
         <span class="font-caption text-caption text-on-surface-variant/80 mt-1 truncate">
           {{ nb_departements }} département{{ 's' if nb_departements > 1 else '' }} opérationnel{{ 's' if nb_departements > 1 else '' }}
         </span>
+        {% if nb_mad %}<a href="/personnel-mad" class="font-caption text-caption text-primary mt-0.5 hover:underline">+ {{ nb_mad }} mis à disposition</a>{% endif %}
       </div>
       <div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center text-primary flex-shrink-0">
         <span class="material-symbols-outlined text-[24px]">group</span>

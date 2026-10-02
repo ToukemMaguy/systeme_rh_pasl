@@ -373,7 +373,8 @@ def generer_fiche_employe_pdf(employe, ctx) -> bytes:
                    colWidths=[40 * mm, 70 * mm])
     gauche.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
     droite = [Paragraph(f"Édité le {date.today().strftime(JOUR)}", st["FPetitD"]),
-              Paragraph(f"par {_e(ctx.get('edite_par') or '—')}", st["FPetitD"]),
+              # Paragraph(f"par {_e(ctx.get('edite_par') or '—')}", st["FPetitD"]),
+              Paragraph("par les Ressources Humaines", st["FPetitD"]),
               ParagraphBalise("<font color='#9B2C2C'><b>DOCUMENT CONFIDENTIEL</b></font>", st["FPetitD"])]
     entete = Table([[gauche, droite]], colWidths=[120 * mm, 60 * mm])
     entete.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
@@ -399,7 +400,7 @@ def generer_fiche_employe_pdf(employe, ctx) -> bytes:
         ParagraphBalise(f"<b>{_e(employe.poste.intitule if employe.poste else '—')}</b> · "
                         f"{_e(employe.grade.libelle if employe.grade else '—')}", st["FSous"]),
         Paragraph(f"{employe.departement.nom if employe.departement else '—'} · "
-                  f"{employe.agence.nom if employe.agence else 'Direction Générale'}", st["FSous"]),
+                  f"{employe.agence.nom if employe.agence else 'Siège'}", st["FSous"]),
         Spacer(1, 3 * mm),
     ]
     chiffres = Table([[
@@ -455,7 +456,7 @@ def generer_fiche_employe_pdf(employe, ctx) -> bytes:
         ("Poste", employe.poste.intitule if employe.poste else None), ("Grade", employe.grade.libelle if employe.grade else None),
         ("Supérieur hiérarchique (N+1)", f"{n1.nom} {n1.prenom}" if n1 else None),
         ("Département", employe.departement.nom if employe.departement else None),
-        ("Agence", employe.agence.nom if employe.agence else "Direction Générale"),
+        ("Agence", employe.agence.nom if employe.agence else "Siège"),
         ("Départ à la retraite (60 ans)", _d(ctx.get("date_retraite")) if ctx.get("date_retraite") else None),
     ], st))
 

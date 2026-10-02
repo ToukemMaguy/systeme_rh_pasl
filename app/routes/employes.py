@@ -9,7 +9,7 @@ from ..database import get_db
 from .. import models
 from .. import pdf as pdf_module
 from ..outils import verifier_fichier, _date_ou_none, _email_valide, _enregistrer_fichier, _entier_ou_none, _exiger_chef_rh, _exiger_lecture, _exiger_non_employe, _exiger_rh, _valider_saisies_employe, templates
-from ..regles_rh import AGE_RETRAITE, contexte_fiche_pdf, date_retraite, _age_annees, _anciennete, _employe_ou_404, _historique_employe, _solde_conges, _tranche_age, _valeurs_depuis_employe
+from ..regles_rh import AGE_RETRAITE, DG_ID, contexte_fiche_pdf, date_retraite, _age_annees, _anciennete, _employe_ou_404, _historique_employe, _solde_conges, _tranche_age, _valeurs_depuis_employe
 
 router = APIRouter()
 
@@ -25,6 +25,19 @@ def _contexte_reference_employe(db: Session, employe_id_exclu: int | None = None
         query_n1 = query_n1.filter(models.Employe.id != employe_id_exclu)
     n_plus_1_possibles = query_n1.order_by(models.Employe.nom, models.Employe.prenom).all()
 
+    # [N+1 — tri par niveau, NON bloquant] Les grades PASL sont encore provisoires (la RH les
+    # redéfinira elle-même une fois l'application en main) : on ne s'en sert donc jamais pour
+    # interdire un choix de N+1, seulement pour faire remonter en premier les profils les plus
+    # gradés dans la liste déroulante. Un grade absent ou mal calibré ne fait jamais planter ni
+    # bloquer le choix — au pire l'ordre d'affichage est juste sous-optimal.
+    n_plus_1_possibles = sorted(
+        n_plus_1_possibles,
+        key=lambda e: (
+            -(e.grade.niveau_hierarchique if e.grade and e.grade.niveau_hierarchique is not None else -1),
+            e.nom or "", e.prenom or "",
+        ),
+    )
+
     # On prépare la liste des N+1 avec leur département pour le filtrage JS
     n_plus_1_data = [
         {
@@ -34,9 +47,17 @@ def _contexte_reference_employe(db: Session, employe_id_exclu: int | None = None
             "matricule": e.matricule or "",
             "poste": e.poste.intitule if e.poste else "",
             "departement_id": e.departement_id,
+            # Pour le tri d'affichage côté JS uniquement — jamais utilisé pour bloquer un choix.
+            "niveau_hierarchique": (
+                e.grade.niveau_hierarchique if e.grade and e.grade.niveau_hierarchique is not None else None
+            ),
         }
         for e in n_plus_1_possibles
     ]
+
+    # Exception DG : on transmet son id au template pour qu'il apparaisse
+    # toujours dans la liste N+1, quel que soit le département sélectionné.
+    dg_existe = db.query(models.Employe.id).filter_by(id=DG_ID).first() is not None
 
     return {
         "departements": db.query(models.Departement).order_by(models.Departement.nom).all(),
@@ -45,6 +66,7 @@ def _contexte_reference_employe(db: Session, employe_id_exclu: int | None = None
         "grades": db.query(models.Grade).order_by(models.Grade.niveau_hierarchique).all(),
         "n_plus_1_possibles": n_plus_1_possibles,
         "n_plus_1_data": n_plus_1_data,
+        "dg_id": DG_ID if dg_existe else None,
     }
 
 # ------------------------------------------------------------------
@@ -152,9 +174,9 @@ def liste_employes(
 
     groupes: dict[str, list] = {}
     for e in employes:
-        cle = e.agence.nom if e.agence else "Direction Générale"
+        cle = e.agence.nom if e.agence else "Siège"
         groupes.setdefault(cle, []).append(e)
-    agences_groupees = sorted(groupes.items(), key=lambda x: (x[0] != "Direction Générale", x[0]))
+    agences_groupees = sorted(groupes.items(), key=lambda x: (x[0] != "Siège", x[0]))
 
     return templates.TemplateResponse(request, "liste_employes.html", {
         "agences_groupees": agences_groupees,
@@ -238,11 +260,13 @@ def creer_employe(
             **_contexte_reference_employe(db),
         }, status_code=400)
 
-    # Vérifier que le N+1 est bien dans le même département
+        # Vérifier que le N+1 est bien dans le même département
+    # ✅ EXCEPTION : le Directeur Général est toujours un N+1 valide, quel que soit son département
     n_plus_1_id_final = _entier_ou_none(n_plus_1_id)
     if n_plus_1_id_final:
         n1 = db.query(models.Employe).get(n_plus_1_id_final)
-        if not n1 or n1.departement_id != departement_id:
+        est_le_dg = n1 is not None and n1.id == DG_ID
+        if not n1 or (not est_le_dg and n1.departement_id != departement_id):
             n_plus_1_id_final = None
 
     employe = models.Employe(
@@ -504,9 +528,11 @@ def modifier_employe(
         n_plus_1_id_final = _entier_ou_none(n_plus_1_id)
 
     # Vérifier que le N+1 est bien dans le même département
+    # ✅ EXCEPTION : le Directeur Général est toujours un N+1 valide, quel que soit son département
     if n_plus_1_id_final:
         n1 = db.query(models.Employe).get(n_plus_1_id_final)
-        if not n1 or n1.departement_id != departement_id or n1.id == employe_id:
+        est_le_dg = n1 is not None and n1.id == DG_ID
+        if not n1 or n1.id == employe_id or (not est_le_dg and n1.departement_id != departement_id):
             n_plus_1_id_final = None  # invalide → on le vide
 
     employe.nom = nom

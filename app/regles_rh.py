@@ -9,6 +9,19 @@ from .notifications import notifier_n_plus_1_a_reaffecter
 # Règle PASL (confirmée par la RH) : 2 jours ouvrables de congé par mois de service, soit 24 jours par an.
 # C'est plus favorable que le minimum du Code du travail camerounais (art. 89 : 1,5 jour par mois).
 # Le solde est recalculé depuis la date d'embauche : modifier cette valeur change TOUS les soldes.
+
+
+# ============================================================
+# N+1 — EXCEPTION DIRECTEUR GÉNÉRAL
+# ------------------------------------------------------------
+# Règle PASL : le N+1 doit être dans le même département que l'employé.
+# EXCEPTION : le Directeur Général est le N+1 des directeurs, des chefs
+# de département, du responsable réclamations et du responsable marketing
+# et communication, quel que soit son département.
+# Les chefs de service, eux, ont pour N+1 le directeur de leur direction
+# (règle normale) — le DG est leur N+2.
+# ============================================================
+DG_ID = 2466
 QUOTA_CONGES_PAR_MOIS = 2
 PLAFOND_PERMISSION_JOURS = 3  # Au-delà, les jours supplémentaires sont déduits du congé annuel
 

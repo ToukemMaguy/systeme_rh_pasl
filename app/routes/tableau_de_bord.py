@@ -208,7 +208,7 @@ def accueil(
     for e in employes_actifs:
         nom_dept = e.departement.nom if e.departement else "Non renseigné"
         compteur_departements[nom_dept] = compteur_departements.get(nom_dept, 0) + 1
-        nom_agence = e.agence.nom if e.agence else "Direction Générale"
+        nom_agence = e.agence.nom if e.agence else "Siège"
         compteur_agences[nom_agence] = compteur_agences.get(nom_agence, 0) + 1
 
     # Répartition départements (avec pourcentage + largeur + couleur)
@@ -394,7 +394,7 @@ def accueil(
             "type_libelle": type_lib,
             "type_icone": icone,
             "type_couleur": coul,
-            "agence_nom": (emp.agence.nom if emp and emp.agence else "Direction Générale"),
+            "agence_nom": (emp.agence.nom if emp and emp.agence else "Siège"),
             "departement_nom": emp.departement.nom if emp and emp.departement else "—",
             "date_demande": d.date_demande,
             "statut": d.statut,
@@ -480,6 +480,8 @@ def accueil(
 
         # KPI principaux
         "effectif_total": effectif_total,
+        # Personnel mis à disposition (registre séparé : pas des employés)
+        "nb_mad": db.query(models.PersonnelMAD).filter(models.PersonnelMAD.actif.is_(True)).count(),
         "demandes_en_attente": demandes_en_attente,
         "nouvelles_embauches": nouvelles_embauches,
         "departs_recents": departs_recents,
@@ -769,7 +771,7 @@ def export_dashboard_xlsx(
 
     compteur_ag: dict[str, int] = {}
     for e in employes_actifs:
-        nom = e.agence.nom if e.agence else "Direction Générale"
+        nom = e.agence.nom if e.agence else "Siège"
         compteur_ag[nom] = compteur_ag.get(nom, 0) + 1
 
     _style_entete_tableau(ws3, 4, ["Agence", "Effectif", "%"])
@@ -886,7 +888,7 @@ def export_dashboard_xlsx(
         _style_ligne_tableau(ws7, lg, [
             f"{emp.nom} {emp.prenom}" if emp else "—",
             d.type_demande.libelle if d.type_demande else "—",
-            (emp.agence.nom if emp and emp.agence else "Direction Générale") if emp else "—",
+            (emp.agence.nom if emp and emp.agence else "Siège") if emp else "—",
             emp.departement.nom if emp and emp.departement else "—",
             d.date_demande.strftime("%d/%m/%Y") if d.date_demande else "—",
             d.statut or "—",
@@ -1062,7 +1064,7 @@ def export_dashboard_csv(
     writer.writerow(["Agence", "Effectif"])
     compteur_ag: dict[str, int] = {}
     for e in employes_actifs:
-        nom = e.agence.nom if e.agence else "Direction Générale"
+        nom = e.agence.nom if e.agence else "Siège"
         compteur_ag[nom] = compteur_ag.get(nom, 0) + 1
     for nom, c in sorted(compteur_ag.items(), key=lambda x: x[1], reverse=True):
         writer.writerow([nom, c])

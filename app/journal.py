@@ -50,6 +50,7 @@ OBJETS_SUIVIS = {
     models.TypeAbsence: "Type d'absence",
     models.TypeDemande: "Type de demande",
     models.Licenciement: "Dossier de licenciement",
+    models.PersonnelMAD: "Personnel mis à disposition",
 }
 
 # Colonnes jamais journalisées (bruit) ou masquées (secret)

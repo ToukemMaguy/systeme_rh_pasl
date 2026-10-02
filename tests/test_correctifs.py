@@ -641,6 +641,7 @@ from openpyxl import load_workbook
 wb = load_workbook(_io.BytesIO(r.content))
 lignes = {l[1]: l for l in wb["Comptes créés"].iter_rows(min_row=5, values_only=True)}
 check("Comptes : fichier Excel des identifiants renvoyé", r.status_code == 200 and "spreadsheetml" in r.headers.get("content-type", "") and "ABENA" in lignes)
+xlsx_comptes = r.content
 check("Comptes : identifiant = email pro en priorité", lignes["ABENA"][4] == "r.abena@pasl.cm")
 check("Comptes : email déjà pris → matricule", lignes["BELLA"][4] == "PASL-778")
 check("Comptes : employé sans email ni matricule listé à part", "Non créés" in wb.sheetnames and any(l[1] == "SANS" for l in wb["Non créés"].iter_rows(values_only=True)))
@@ -655,6 +656,24 @@ c_maj = ouvrir_page_connexion()
 check("Connexion avec l'email en majuscules", c_maj.post("/login", data={"email": "R.ABENA@PASL.CM", "mot_de_passe": mdp_abena}).status_code == 303)
 r = adm.post("/admin/utilisateurs/creer-comptes-manquants")
 check("Comptes : second passage sans doublon (message pour l'employé sans identifiant)", r.status_code == 303 and "SANS" in unquote(r.headers["location"]) and db.query(models.Utilisateur).filter_by(employe_id=m1.id).count() == 1)
+# Guides utilisateurs : une page par employé, accès imprimés depuis le fichier Excel des comptes
+import re as _re, tempfile
+from app.scripts.imprimer_identifiants import lire_comptes, identifiants_des_n_plus_1
+from app.guides_utilisateurs import guides_personnalises, guides_vierges
+with tempfile.TemporaryDirectory() as _dossier:
+    _xlsx = os.path.join(_dossier, "comptes.xlsx"); open(_xlsx, "wb").write(xlsx_comptes)
+    _comptes = lire_comptes(_xlsx)
+    check("Guides : comptes relus depuis l'Excel « Créer les comptes manquants »",
+          any(c["identifiant"] == "r.abena@pasl.cm" and c["mot_de_passe"] == mdp_abena and c["nom"] == "ABENA" for c in _comptes))
+    _pdf = os.path.join(_dossier, "acces.pdf")
+    guides_personnalises(_pdf, [("employe", {"nom": "ABENA <Rose>", "unite": "Agence & Co", "adresse": "http://srv:8000",
+                                             "identifiant": "r.abena@pasl.cm", "mot_de_passe": mdp_abena}),
+                                ("n_plus_1", {"nom": "X", "unite": "", "adresse": "http://srv:8000", "identifiant": "x", "mot_de_passe": "y"})])
+    _vierge = os.path.join(_dossier, "vierges.pdf"); guides_vierges(_vierge)
+    _pages = lambda p: len(_re.findall(rb"/Type /Page\b", open(p, "rb").read()))
+    check("Guides : une page A4 par personne et par guide (caractères spéciaux acceptés)", _pages(_pdf) == 2)
+    check("Guides : les 4 guides vierges tiennent chacun sur une page", _pages(_vierge) == 4)
+check("Guides : repérage des N+1 dans la base", isinstance(identifiants_des_n_plus_1(), set))
 # Point 8 : aucune ressource externe
 for page in ["/login", "/employes"]:
     html = (ouvrir_page_connexion() if page == "/login" else rh).get(page).text

@@ -22,7 +22,7 @@ from .securite import verifier_csrf
 from .regles_rh import appliquer_departs_echus
 from . import journal  # [LOT 1 - POINT 1] active l'enregistrement automatique du journal d'audit
 from datetime import date
-from .routes import auth, tableau_de_bord, employes, demandes, espace, absences, conges, admin, compte, licenciements, calendrier_equipe
+from .routes import auth, tableau_de_bord, employes, demandes, espace, absences, conges, admin, compte, licenciements, calendrier_equipe, fichier_rh, personnel_mad
 
 # ============================================================
 # APPLICATION
@@ -191,5 +191,5 @@ async def gerer_erreur_inattendue(request: Request, exc: Exception):
 # Assemblage des modules (l'ordre est celui de l'ancien main.py : il compte pour les adresses
 # qui se ressemblent, ex. /employes/nouveau doit passer avant /employes/{employe_id})
 for module in (auth, tableau_de_bord, employes, demandes, espace, absences, conges, admin, compte, licenciements,
-               calendrier_equipe):
+               calendrier_equipe, fichier_rh, personnel_mad):
     app.include_router(module.router)

@@ -247,38 +247,35 @@
   const nPlus1Selectionne = {{ valeurs.n_plus_1_id | tojson if valeurs.n_plus_1_id else 'null' }};
 
   function filtrerN1() {
-    const selectDept = document.getElementById('select-departement');
-    const selectN1 = document.getElementById('select-n1');
+  const deptId = parseInt(document.getElementById('departement_id').value, 10);
+  const dgId = {{ dg_id | tojson }};
+  const tous = {{ n_plus_1_data | tojson }};
 
-    if (!selectDept || !selectN1) return;
+  // Le DG est toujours proposé, quel que soit le département
+  const candidats = tous.filter(function(e) {
+    return e.departement_id === deptId || (dgId && e.id === dgId);
+  });
 
-    const deptId = selectDept.value ? parseInt(selectDept.value) : null;
+  // Tri : niveau hiérarchique décroissant, puis nom
+  candidats.sort(function(a, b) {
+    const na = a.niveau_hierarchique === null ? -1 : a.niveau_hierarchique;
+    const nb = b.niveau_hierarchique === null ? -1 : b.niveau_hierarchique;
+    if (na !== nb) return nb - na;
+    return (a.nom + a.prenom).localeCompare(b.nom + b.prenom);
+  });
 
-    // Vider le select N+1 (sauf la 1ère option)
-    selectN1.innerHTML = '<option value="">— Aucun —</option>';
-
-    if (!deptId) return;
-
-    // Filtrer les N+1 du même département
-    const candidats = nPlus1Data.filter(function(e) {
-      return e.departement_id === deptId;
-    });
-
-    // Trier par nom
-    candidats.sort(function(a, b) {
-      return (a.nom + a.prenom).localeCompare(b.nom + b.prenom);
-    });
-
-    candidats.forEach(function(e) {
-      const opt = document.createElement('option');
-      opt.value = e.id;
-      opt.textContent = e.nom + ' ' + e.prenom + ' — ' + (e.poste || 'sans poste') + ' (' + (e.matricule || 'sans matricule') + ')';
-      if (nPlus1Selectionne && e.id === nPlus1Selectionne) {
-        opt.selected = true;
-      }
-      selectN1.appendChild(opt);
-    });
-  }
+  const select = document.getElementById('n_plus_1_id');
+  const valeurActuelle = select.value;
+  select.innerHTML = '<option value="">— Aucun —</option>';
+  candidats.forEach(function(e) {
+    const opt = document.createElement('option');
+    opt.value = e.id;
+    const marque = (dgId && e.id === dgId) ? ' ★' : '';
+    opt.textContent = e.nom + ' ' + e.prenom + (e.poste ? ' — ' + e.poste : '') + marque;
+    if (String(e.id) === valeurActuelle) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
 
   // Appel au chargement de la page
   document.addEventListener('DOMContentLoaded', filtrerN1);
